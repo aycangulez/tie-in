@@ -1,0 +1,23 @@
+{
+    "name": "fn-comp",
+    "version": "1.0.0",
+    "description": "Lightweight relational component library.",
+    "main": "fn-comp.js",
+    "scripts": {
+        "test": "mocha"
+    },
+    "author": "Aycan Gulez",
+    "license": "MIT",
+    "dependencies": {
+        "fn-arg-validator": "^1.0.5",
+        "fn-tester": "^1.0.2",
+        "knex": "^3.1.0",
+        "lodash": "^4.17.21"
+    },
+    "devDependencies": {
+        "chai": "^4.3.10",
+        "chai-as-promised": "^7.1.1",
+        "mocha": "^10.2.0",
+        "pg": "^8.11.3"
+    }
+}
