@@ -6,37 +6,11 @@ const knex = require('knex')({
 });
 
 const comp = require('../fn-comp')(knex);
-const is = require('fn-arg-validator');
+const post = require('../components/post')();
 const chai = require('chai');
 const chaiAsPromised = require('chai-as-promised');
 const should = chai.should();
 chai.use(chaiAsPromised).should();
-
-function post(id, postText) {
-    is.valid(is.maybeNumber, is.maybeString, arguments);
-    const componentName = post.name;
-    return {
-        data: () => {
-            return {
-                [componentName]: {
-                    id,
-                    postText,
-                },
-            };
-        },
-        schema: async (knex, tablePrefix = '') => {
-            const tableName = tablePrefix + componentName;
-            const exists = await knex.schema.hasTable(tableName);
-            if (!exists) {
-                return await knex.schema.createTable(tableName, function (table) {
-                    table.increments('id').primary();
-                    table.string('postText');
-                    table.timestamps(false, true, true);
-                });
-            }
-        },
-    };
-}
 
 describe('comp.get', function () {
     it('should call fn.selectRecords', async function () {

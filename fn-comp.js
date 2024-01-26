@@ -1,6 +1,7 @@
 const _ = require('lodash/fp');
 const is = require('fn-arg-validator');
 const fn = require('fn-tester');
+const rel = require('./components/rel')();
 
 const comp = function (knex, tablePrefix = '') {
     is.valid(is.object, is.maybeString, arguments);
@@ -18,11 +19,15 @@ const comp = function (knex, tablePrefix = '') {
     }
 
     async function insertRecord(componentName, componentKeyValues) {
-        return await knex(componentName).insert(componentKeyValues).returning('id');
+        return await knex(tablePrefix + componentName)
+            .insert(componentKeyValues)
+            .returning('id');
     }
 
     async function selectRecords(componentName, componentKeyValues) {
-        return await knex(componentName).select('*').where(componentKeyValues);
+        return await knex(tablePrefix + componentName)
+            .select('*')
+            .where(componentKeyValues);
     }
 
     this.create = async function create(component, rels = []) {
@@ -36,6 +41,10 @@ const comp = function (knex, tablePrefix = '') {
         const [componentName, componentKeyValues] = extractComponentData(component);
         const result = fn.run(selectRecords, null, componentName, componentKeyValues);
         return { [componentName]: _.head(result) };
+    };
+
+    this.init = async function init() {
+        return await rel().schema(knex, tablePrefix);
     };
 
     this.fn = fn;
