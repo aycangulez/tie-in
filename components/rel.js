@@ -1,4 +1,4 @@
-const is = require('fn-arg-validator');
+const { is } = require('../helper');
 
 function rel(componentName = 'rel') {
     const compSchema = {
@@ -9,11 +9,13 @@ function rel(componentName = 'rel') {
             if (!exists) {
                 return await knex.schema.createTable(tableName, function (table) {
                     table.increments('id').primary();
-                    table.string('sourceComponent');
-                    table.integer('sourceId');
-                    table.string('targetComponent');
-                    table.integer('targetId');
+                    table.string('sourceComponent').notNullable();
+                    table.integer('sourceId').notNullable();
+                    table.string('targetComponent').notNullable();
+                    table.integer('targetId').notNullable();
                     table.timestamps(false, true, true);
+                    table.index(['sourceComponent', 'sourceId']);
+                    table.index(['targetComponent', 'targetId']);
                 });
             }
         },

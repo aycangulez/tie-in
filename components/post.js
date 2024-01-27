@@ -1,4 +1,4 @@
-const is = require('fn-arg-validator');
+const { is } = require('../helper');
 
 function post(componentName = 'post') {
     const compSchema = {
@@ -9,7 +9,7 @@ function post(componentName = 'post') {
             if (!exists) {
                 return await knex.schema.createTable(tableName, function (table) {
                     table.increments('id').primary();
-                    table.text('postText');
+                    table.text('postText').notNullable();
                     table.timestamps(false, true, true);
                 });
             }

@@ -1,6 +1,6 @@
 const _ = require('lodash/fp');
-const is = require('fn-arg-validator');
 const fn = require('fn-tester');
+const { is } = require('./helper');
 const rel = require('./components/rel')();
 
 const comp = function (knex, tablePrefix = '') {
