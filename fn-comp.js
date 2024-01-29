@@ -35,45 +35,48 @@ const fnComp = function (knex, tablePrefix = '') {
             .then(_.head);
     }
 
-    async function getRelSources(rels, trx = knex) {
+    async function checkRelSources(relSources, trx = knex) {
         is.valid(is.maybeArray, is.maybeObject, arguments);
-        const sourceRecords = _.map((v) => selectRecords(extractCompData(v), trx))(rels);
+        const sourceRecords = _.map((v) => selectRecords(extractCompData(v), trx))(relSources);
         const sourceData = await Promise.all(sourceRecords);
         const numSourcesReturned = _.flow(_.compact, _.get('length'))(sourceData);
-        if (numSourcesReturned < _.get('length')(rels)) {
+        if (numSourcesReturned < _.get('length')(relSources)) {
             throw new Error('Missing relation sources.');
         }
     }
 
-    function insertRels(rels, targetComponent, targetId, trx = knex) {
+    async function insertRels(relSources, targetComponent, targetId, trx = knex) {
         is.valid(is.maybeArray, is.maybeString, is.maybeNumber, is.maybeObject, arguments);
-        const promises = [];
-        _.each((rel) => {
-            let [relName, relKeyValues] = extractCompData(rel);
-            promises.push(
-                fn.run(
-                    insertRecord,
-                    null,
-                    [
-                        'rel',
-                        { sourceComponent: relName, sourceId: _.get('id')(relKeyValues), targetComponent, targetId },
-                    ],
-                    trx
+        let promises = [];
+        _.each((relSource) => {
+            let [relSourceName, relSourceKeyValues] = extractCompData(relSource);
+            let relRecord = {
+                sourceComponent: relSourceName,
+                sourceId: _.get('id')(relSourceKeyValues),
+                targetComponent,
+                targetId,
+            };
+            promises.push(() =>
+                selectRecords(['rel', relRecord], trx).then((result) =>
+                    result ? false : fn.run(insertRecord, null, ['rel', relRecord], trx)
                 )
             );
-        })(rels);
-        return Promise.all(promises);
+        })(relSources);
+        for (let p in promises) {
+            await promises[p]();
+        }
+        return targetId;
     }
 
-    this.create = async function create(comp, rels = []) {
+    this.create = async function create(comp, relSources = []) {
         is.valid(is.objectWithProps(compProps), is.maybeArray, arguments);
         const compData = extractCompData(comp);
         return await knex.transaction(
             async (trx) =>
                 await chain(
-                    () => fn.run(getRelSources, null, rels, trx),
-                    (rels) => fn.run(insertRecord, null, compData, trx),
-                    (id) => fn.run(insertRels, null, rels, compData[0], id, trx)
+                    () => fn.run(checkRelSources, null, relSources, trx),
+                    () => fn.run(insertRecord, null, compData, trx),
+                    (id) => fn.run(insertRels, null, relSources, compData[0], id, trx)
                 )
         );
     };
