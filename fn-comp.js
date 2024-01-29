@@ -1,50 +1,95 @@
 const _ = require('lodash/fp');
+const chain = require('fn-one');
 const fn = require('fn-tester');
 const { is } = require('./helper');
 const rel = require('./components/rel')();
 
-const comp = function (knex, tablePrefix = '') {
+const fnComp = function (knex, tablePrefix = '') {
     is.valid(is.object, is.maybeString, arguments);
-    const componentProps = { data: is.func, schema: is.func };
+    const compProps = { data: is.func, schema: is.func };
 
-    function extractComponentData(component) {
-        is.valid(is.objectWithProps(componentProps), arguments);
-        let componentData = component.data();
-        let componentName = _.flow(_.keys, _.head)(componentData);
-        let componentKeyValues = _.flow(
-            _.get(componentName),
+    function extractCompData(comp) {
+        is.valid(is.objectWithProps(compProps), arguments);
+        let compData = comp.data();
+        let compName = _.flow(_.keys, _.head)(compData);
+        let compKeyVals = _.flow(
+            _.get(compName),
             _.pickBy((v) => !_.isUndefined(v))
-        )(componentData);
-        return [componentName, componentKeyValues];
+        )(compData);
+        return [compName, compKeyVals];
     }
 
-    async function insertRecord(componentName, componentKeyValues) {
-        return await knex(tablePrefix + componentName)
-            .insert(componentKeyValues)
-            .returning('id');
+    function insertRecord([compName, compKeyVals], trx = knex) {
+        is.valid(is.maybeArray, is.maybeObject, arguments);
+        return trx(tablePrefix + compName)
+            .insert(compKeyVals)
+            .returning('id')
+            .then(_.flow(_.head, _.get('id')));
     }
 
-    async function selectRecords(componentName, componentKeyValues) {
-        return await knex(tablePrefix + componentName)
+    function selectRecords([compName, compKeyVals], trx = knex) {
+        is.valid(is.maybeArray, is.maybeObject, arguments);
+        return trx(tablePrefix + compName)
             .select('*')
-            .where(componentKeyValues);
+            .where(compKeyVals)
+            .then(_.head);
     }
 
-    this.create = async function create(component, rels = []) {
-        is.valid(is.objectWithProps(componentProps), is.maybeArray, arguments);
-        const [componentName, componentKeyValues] = extractComponentData(component);
-        return await fn.run(insertRecord, null, componentName, componentKeyValues);
+    async function getRelSources(rels, trx = knex) {
+        is.valid(is.maybeArray, is.maybeObject, arguments);
+        const sourceRecords = _.map((v) => selectRecords(extractCompData(v), trx))(rels);
+        const sourceData = await Promise.all(sourceRecords);
+        const numSourcesReturned = _.flow(_.compact, _.get('length'))(sourceData);
+        if (numSourcesReturned < _.get('length')(rels)) {
+            throw new Error('Missing relation sources.');
+        }
+    }
+
+    function insertRels(rels, targetComponent, targetId, trx = knex) {
+        is.valid(is.maybeArray, is.maybeString, is.maybeNumber, is.maybeObject, arguments);
+        const promises = [];
+        _.each((rel) => {
+            let [relName, relKeyValues] = extractCompData(rel);
+            promises.push(
+                fn.run(
+                    insertRecord,
+                    null,
+                    [
+                        'rel',
+                        { sourceComponent: relName, sourceId: _.get('id')(relKeyValues), targetComponent, targetId },
+                    ],
+                    trx
+                )
+            );
+        })(rels);
+        return Promise.all(promises);
+    }
+
+    this.create = async function create(comp, rels = []) {
+        is.valid(is.objectWithProps(compProps), is.maybeArray, arguments);
+        const compData = extractCompData(comp);
+        return await knex.transaction(
+            async (trx) =>
+                await chain(
+                    () => fn.run(getRelSources, null, rels, trx),
+                    (rels) => fn.run(insertRecord, null, compData, trx),
+                    (id) => fn.run(insertRels, null, rels, compData[0], id, trx)
+                )
+        );
     };
 
-    this.get = async function get(component, filters) {
-        is.valid(is.objectWithProps(componentProps), is.maybeObject, arguments);
-        const [componentName, componentKeyValues] = extractComponentData(component);
-        const result = fn.run(selectRecords, null, componentName, componentKeyValues);
-        return { [componentName]: _.head(result) };
+    this.get = async function get(comp, filters) {
+        is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
+        const compData = extractCompData(comp);
+        const result = fn.run(selectRecords, null, compData);
+        return { [compData[0]]: _.head(result) };
     };
 
-    this.init = async function init() {
-        return await rel().schema(knex, tablePrefix);
+    this.init = async function init(comps = []) {
+        is.valid(is.maybeArray, arguments);
+        const componetSchemas = _.map((comp) => comp.schema(knex, tablePrefix))(comps);
+        await Promise.all(componetSchemas);
+        await rel().schema(knex, tablePrefix);
     };
 
     this.fn = fn;
@@ -52,4 +97,4 @@ const comp = function (knex, tablePrefix = '') {
     return this;
 };
 
-module.exports = comp;
+module.exports = fnComp;

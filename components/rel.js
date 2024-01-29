@@ -1,13 +1,13 @@
 const { is } = require('../helper');
 
-function rel(componentName = 'rel') {
+function rel(compName = 'rel') {
     const compSchema = {
         async schema(knex, tablePrefix = '') {
             is.valid(is.object, is.maybeString, arguments);
-            const tableName = tablePrefix + componentName;
+            const tableName = tablePrefix + compName;
             const exists = await knex.schema.hasTable(tableName);
             if (!exists) {
-                return await knex.schema.createTable(tableName, function (table) {
+                return knex.schema.createTable(tableName, function (table) {
                     table.increments('id').primary();
                     table.string('sourceComponent').notNullable();
                     table.integer('sourceId').notNullable();
@@ -26,7 +26,7 @@ function rel(componentName = 'rel') {
         const compObject = Object.create(compSchema);
         compObject.data = () => {
             return {
-                [componentName]: {
+                [compName]: {
                     id,
                     sourceComponent,
                     sourceId,

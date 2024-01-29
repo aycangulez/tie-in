@@ -1,6 +1,6 @@
 const { is } = require('../helper');
 
-function post(compName = 'post') {
+function user(compName = 'user') {
     const compSchema = {
         async schema(knex, tablePrefix = '') {
             is.valid(is.object, is.maybeString, arguments);
@@ -9,21 +9,24 @@ function post(compName = 'post') {
             if (!exists) {
                 return knex.schema.createTable(tableName, function (table) {
                     table.increments('id').primary();
-                    table.text('postText').notNullable();
+                    table.string('username').notNullable();
+                    table.string('email').notNullable();
                     table.timestamps(false, true, true);
+                    table.unique('email');
                 });
             }
         },
     };
 
-    return function (id, postText) {
-        is.valid(is.maybeNumber, is.maybeString, arguments);
+    return function (id, username, email) {
+        is.valid(is.maybeNumber, is.maybeString, is.maybeString, arguments);
         const compObject = Object.create(compSchema);
         compObject.data = () => {
             return {
                 [compName]: {
                     id,
-                    postText,
+                    username,
+                    email,
                 },
             };
         };
@@ -31,4 +34,4 @@ function post(compName = 'post') {
     };
 }
 
-module.exports = post;
+module.exports = user;

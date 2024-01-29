@@ -7,6 +7,7 @@ const knex = require('knex')({
 
 const comp = require('../fn-comp')(knex);
 const post = require('../components/post')();
+const user = require('../components/user')();
 const chai = require('chai');
 const chaiAsPromised = require('chai-as-promised');
 const should = chai.should();
@@ -23,8 +24,7 @@ describe('comp.get', function () {
                 },
             ],
         };
-
         await comp.fn.run(comp, 'get', post(1));
-        comp.fn.test.calls.should.be.an('array').that.deep.includes(['selectRecords', 'post', { id: 1 }]);
+        comp.fn.test.calls.should.be.an('array').that.deep.includes(['selectRecords', ['post', { id: 1 }]]);
     });
 });
