@@ -79,16 +79,14 @@ const fnComp = function (knex, tablePrefix = '') {
         return sourceId;
     }
 
-    async function getUpstreamRecords(comp, originCompName = '', result = {}) {
-        is.valid(is.objectWithProps(compProps), is.maybeString, is.maybeObject, arguments);
-        if (!originCompName) {
-            originCompName = comp.name;
-        }
-
+    async function getUpstreamRecords(comp, originCompName, result = {}) {
+        is.valid(is.objectWithProps(compProps), is.string, is.maybeObject, arguments);
         const compRecs = await fn.run(selectRecords, null, comp.name, compact(comp));
-        result[comp.name] = [];
+        if (!result[comp.name]) {
+            result[comp.name] = [];
+        }
         for (let i = 0, cLen = compRecs.length; i < cLen; i++) {
-            result[comp.name][i] = { self: compRecs[i] };
+            result[comp.name].push({ self: compRecs[i] });
 
             let relData = compact(rel(undefined, undefined, undefined, comp.name, compRecs[i].id));
             let relRecs = await fn.run(selectRecords, null, 'rel', relData);
@@ -121,7 +119,7 @@ const fnComp = function (knex, tablePrefix = '') {
 
     this.get = async function get(comp, filters = {}) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
-        return await getUpstreamRecords(comp);
+        return await getUpstreamRecords(comp, comp.name);
     };
 
     this.init = async function init(compCollection = []) {
