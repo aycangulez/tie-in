@@ -2,6 +2,7 @@ const { is } = require('../helper');
 
 function post(compName = 'post') {
     const compSchema = {
+        name: compName,
         async schema(knex, tablePrefix = '') {
             is.valid(is.object, is.maybeString, arguments);
             const tableName = tablePrefix + compName;

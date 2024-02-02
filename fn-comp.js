@@ -6,60 +6,53 @@ const rel = require('./components/rel')();
 
 const fnComp = function (knex, tablePrefix = '') {
     is.valid(is.object, is.maybeString, arguments);
-    const compProps = { data: is.func, schema: is.func };
+    var comps = {};
+    const compProps = { name: is.string, data: is.func, schema: is.func };
 
-    function extractCompData(comp) {
+    function compact(comp) {
         is.valid(is.objectWithProps(compProps), arguments);
-        let compData = comp.data();
-        let compName = _.flow(_.keys, _.head)(compData);
-        let compKeyVals = _.flow(
-            _.get(compName),
+        return _.flow(
+            _.get(comp.name),
             _.pickBy((v) => !_.isUndefined(v))
-        )(compData);
-        return [compName, compKeyVals];
+        )(comp.data());
     }
 
-    function insertRecord([compName, compKeyVals], trx = knex) {
-        is.valid(is.maybeArray, is.maybeObject, arguments);
+    function insertRecord(compName, compData, trx = knex) {
+        is.valid(is.string, is.object, is.maybeObject, arguments);
         return trx(tablePrefix + compName)
-            .insert(compKeyVals)
+            .insert(compData)
             .returning('id')
             .then(_.flow(_.head, _.get('id')));
     }
 
-    function selectRecords([compName, compKeyVals], trx = knex) {
-        is.valid(is.maybeArray, is.maybeObject, arguments);
+    function selectRecords(compName, compData, trx = knex) {
+        is.valid(is.string, is.object, is.maybeObject, arguments);
         return trx(tablePrefix + compName)
             .select('*')
-            .where(compKeyVals)
-            .then(_.head);
+            .where(compData)
+            .orderBy('id');
     }
 
     async function checkRelSources(relSources, trx = knex) {
         is.valid(is.maybeArray, is.maybeObject, arguments);
-        const sourceRecords = _.map((v) => selectRecords(extractCompData(v), trx))(relSources);
-        const sourceData = await Promise.all(sourceRecords);
-        const numSourcesReturned = _.flow(_.compact, _.get('length'))(sourceData);
+        const sourcePromises = _.map((v) => fn.run(selectRecords, null, v.name, compact(v), trx))(relSources);
+        const sourceRecs = await Promise.all(sourcePromises);
+        const numSourcesReturned = _.flow(_.compact, _.get('length'))(sourceRecs);
         if (numSourcesReturned < _.get('length')(relSources)) {
             throw new Error('Missing relation sources.');
         }
     }
 
-    async function insertRels(relSources, targetComponent, targetId, trx = knex) {
+    async function insertRels(relSources, targetComp, targetId, trx = knex) {
         is.valid(is.maybeArray, is.maybeString, is.maybeNumber, is.maybeObject, arguments);
         let promises = [];
         _.each((relSource) => {
-            let [relSourceName, relSourceKeyValues] = extractCompData(relSource);
-            let relRecord = {
-                sourceComponent: relSourceName,
-                sourceId: _.get('id')(relSourceKeyValues),
-                targetComponent,
-                targetId,
-            };
+            let relSourceData = compact(relSource);
+            let relData = compact(rel(undefined, relSource.name, _.get('id')(relSourceData), targetComp, targetId));
             promises.push(() =>
-                selectRecords(['rel', relRecord], trx).then((result) =>
-                    result ? false : fn.run(insertRecord, null, ['rel', relRecord], trx)
-                )
+                fn
+                    .run(selectRecords, null, 'rel', relData, trx)
+                    .then((result) => (_.head(result) ? false : fn.run(insertRecord, null, 'rel', relData, trx)))
             );
         })(relSources);
         for (let p in promises) {
@@ -68,31 +61,56 @@ const fnComp = function (knex, tablePrefix = '') {
         return targetId;
     }
 
+    async function getUpstreamRecords(comp, originCompName = '', result = {}) {
+        is.valid(is.objectWithProps(compProps), is.maybeString, is.maybeObject, arguments);
+        if (!originCompName) {
+            originCompName = comp.name;
+        }
+
+        const compRecs = await fn.run(selectRecords, null, comp.name, compact(comp));
+        result[comp.name] = [];
+        for (let i = 0, cLen = compRecs.length; i < cLen; i++) {
+            result[comp.name][i] = { self: compRecs[i] };
+
+            let relData = compact(rel(undefined, undefined, undefined, comp.name, compRecs[i].id));
+            let relRecs = await fn.run(selectRecords, null, 'rel', relData);
+
+            for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
+                let relRec = relRecs[j];
+                if (relRec.sourceComp === originCompName) {
+                    break;
+                }
+
+                let sourceComp = comps[relRec.sourceComp](relRec.sourceId);
+                result = await getUpstreamRecords(sourceComp, originCompName, result);
+            }
+        }
+        return result;
+    }
+
     this.create = async function create(comp, relSources = []) {
         is.valid(is.objectWithProps(compProps), is.maybeArray, arguments);
-        const compData = extractCompData(comp);
         return await knex.transaction(
             async (trx) =>
                 await chain(
                     () => fn.run(checkRelSources, null, relSources, trx),
-                    () => fn.run(insertRecord, null, compData, trx),
-                    (id) => fn.run(insertRels, null, relSources, compData[0], id, trx)
+                    () => fn.run(insertRecord, null, comp.name, compact(comp), trx),
+                    (id) => fn.run(insertRels, null, relSources, comp.name, id, trx)
                 )
         );
     };
 
-    this.get = async function get(comp, filters) {
+    this.get = async function get(comp, filters = {}) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
-        const compData = extractCompData(comp);
-        const result = fn.run(selectRecords, null, compData);
-        return { [compData[0]]: _.head(result) };
+        return await getUpstreamRecords(comp);
     };
 
-    this.init = async function init(comps = []) {
+    this.init = async function init(compCollection = []) {
         is.valid(is.maybeArray, arguments);
-        const componetSchemas = _.map((comp) => comp.schema(knex, tablePrefix))(comps);
+        compCollection.push(rel);
+        const componetSchemas = _.map((comp) => comp().schema(knex, tablePrefix))(compCollection);
         await Promise.all(componetSchemas);
-        await rel().schema(knex, tablePrefix);
+        _.each((comp) => (comps[comp().name] = comp))(compCollection);
     };
 
     this.fn = fn;
