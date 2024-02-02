@@ -43,7 +43,7 @@ const fnComp = function (knex, tablePrefix = '') {
         }
     }
 
-    async function insertRels(relSources, targetComp, targetId, trx = knex) {
+    async function insertUpstreamRels(relSources, targetComp, targetId, trx = knex) {
         is.valid(is.maybeArray, is.maybeString, is.maybeNumber, is.maybeObject, arguments);
         let promises = [];
         _.each((relSource) => {
@@ -59,6 +59,24 @@ const fnComp = function (knex, tablePrefix = '') {
             await promises[p]();
         }
         return targetId;
+    }
+
+    async function insertDownstreamRels(relTargets, sourceComp, sourceId, trx = knex) {
+        is.valid(is.maybeArray, is.maybeString, is.maybeNumber, is.maybeObject, arguments);
+        let promises = [];
+        _.each((relTarget) => {
+            let relTargetData = compact(relTarget);
+            let relData = compact(rel(undefined, sourceComp, sourceId, relTarget.name, _.get('id')(relTargetData)));
+            promises.push(() =>
+                fn
+                    .run(selectRecords, null, 'rel', relData, trx)
+                    .then((result) => (_.head(result) ? false : fn.run(insertRecord, null, 'rel', relData, trx)))
+            );
+        })(relTargets);
+        for (let p in promises) {
+            await promises[p]();
+        }
+        return sourceId;
     }
 
     async function getUpstreamRecords(comp, originCompName = '', result = {}) {
@@ -88,14 +106,15 @@ const fnComp = function (knex, tablePrefix = '') {
         return result;
     }
 
-    this.create = async function create(comp, relSources = []) {
-        is.valid(is.objectWithProps(compProps), is.maybeArray, arguments);
+    this.create = async function create(comp, upstreamRelSources = [], downstreamRelTargets = []) {
+        is.valid(is.objectWithProps(compProps), is.maybeArray, is.maybeArray, arguments);
         return await knex.transaction(
             async (trx) =>
                 await chain(
-                    () => fn.run(checkRelSources, null, relSources, trx),
+                    () => fn.run(checkRelSources, null, _.concat(upstreamRelSources, downstreamRelTargets), trx),
                     () => fn.run(insertRecord, null, comp.name, compact(comp), trx),
-                    (id) => fn.run(insertRels, null, relSources, comp.name, id, trx)
+                    (id) => fn.run(insertUpstreamRels, null, upstreamRelSources, comp.name, id, trx),
+                    (id) => fn.run(insertDownstreamRels, null, downstreamRelTargets, comp.name, id, trx)
                 )
         );
     };
