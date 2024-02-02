@@ -82,7 +82,7 @@ const fnComp = function (knex, tablePrefix = '') {
                 }
 
                 let sourceComp = comps[relRec.sourceComp](relRec.sourceId);
-                result = await getUpstreamRecords(sourceComp, originCompName, result);
+                result[comp.name][i] = await getUpstreamRecords(sourceComp, originCompName, result[comp.name][i]);
             }
         }
         return result;
