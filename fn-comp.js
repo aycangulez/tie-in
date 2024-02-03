@@ -17,7 +17,7 @@ const fnComp = function (knex, tablePrefix = '') {
         )(comp.data());
     }
 
-    function insertRecord(compName, compData, trx = knex) {
+    async function insertRecord(compName, compData, trx = knex) {
         is.valid(is.string, is.object, is.maybeObject, arguments);
         return trx(tablePrefix + compName)
             .insert(compData)
@@ -25,12 +25,14 @@ const fnComp = function (knex, tablePrefix = '') {
             .then(_.flow(_.head, _.get('id')));
     }
 
-    function selectRecords(compName, compData, trx = knex) {
-        is.valid(is.string, is.object, is.maybeObject, arguments);
+    async function selectRecords(compName, compData, trx = knex, offset = 0, limit = 10) {
+        is.valid(is.string, is.object, is.maybeObject, is.maybeNumber, is.maybeNumber, arguments);
         return trx(tablePrefix + compName)
             .select('*')
             .where(compData)
-            .orderBy('id');
+            .orderBy('id')
+            .offset(offset)
+            .limit(limit);
     }
 
     async function checkRelSources(relSources, trx = knex) {
@@ -79,9 +81,9 @@ const fnComp = function (knex, tablePrefix = '') {
         return sourceId;
     }
 
-    async function getUpstreamRecords(comp, rootCompName, result = {}) {
-        is.valid(is.objectWithProps(compProps), is.string, is.maybeObject, arguments);
-        const compRecs = await fn.run(selectRecords, null, comp.name, compact(comp));
+    async function getUpstreamRecords(comp, rootCompName, result = {}, selectRecordsFunc = selectRecords) {
+        is.valid(is.objectWithProps(compProps), is.string, is.maybeObject, is.maybeFunc, arguments);
+        const compRecs = await selectRecordsFunc(comp.name, compact(comp));
         if (!result[comp.name]) {
             result[comp.name] = [];
         }
@@ -89,7 +91,7 @@ const fnComp = function (knex, tablePrefix = '') {
             result[comp.name].push({ self: compRecs[i] });
 
             let relData = compact(rel(undefined, undefined, undefined, comp.name, compRecs[i].id));
-            let relRecs = await fn.run(selectRecords, null, 'rel', relData);
+            let relRecs = await selectRecordsFunc('rel', relData);
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
                 let relRec = relRecs[j];
@@ -98,15 +100,20 @@ const fnComp = function (knex, tablePrefix = '') {
                 }
 
                 let sourceComp = comps[relRec.sourceComp](relRec.sourceId);
-                result[comp.name][i] = await getUpstreamRecords(sourceComp, rootCompName, result[comp.name][i]);
+                result[comp.name][i] = await getUpstreamRecords(
+                    sourceComp,
+                    rootCompName,
+                    result[comp.name][i],
+                    selectRecordsFunc
+                );
             }
         }
         return result;
     }
 
-    async function getDownstreamRecords(comp, rootCompName, result = {}) {
-        is.valid(is.objectWithProps(compProps), is.string, is.maybeObject, arguments);
-        const compRecs = await fn.run(selectRecords, null, comp.name, compact(comp));
+    async function getDownstreamRecords(comp, rootCompName, result = {}, selectRecordsFunc = selectRecords) {
+        is.valid(is.objectWithProps(compProps), is.string, is.maybeObject, is.maybeFunc, arguments);
+        const compRecs = await selectRecordsFunc(comp.name, compact(comp));
         if (!result[comp.name]) {
             result[comp.name] = [];
         }
@@ -114,7 +121,7 @@ const fnComp = function (knex, tablePrefix = '') {
             result[comp.name].push({ self: compRecs[i] });
 
             let relData = compact(rel(undefined, comp.name, compRecs[i].id));
-            let relRecs = await fn.run(selectRecords, null, 'rel', relData);
+            let relRecs = await selectRecordsFunc('rel', relData);
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
                 let relRec = relRecs[j];
@@ -123,7 +130,12 @@ const fnComp = function (knex, tablePrefix = '') {
                 }
 
                 let targetComp = comps[relRec.targetComp](relRec.targetId);
-                result[comp.name][i] = await getDownstreamRecords(targetComp, rootCompName, result[comp.name][i]);
+                result[comp.name][i] = await getDownstreamRecords(
+                    targetComp,
+                    rootCompName,
+                    result[comp.name][i],
+                    selectRecordsFunc
+                );
             }
         }
         return result;
@@ -148,9 +160,11 @@ const fnComp = function (knex, tablePrefix = '') {
             return { [compName]: _.slice(0, _.get('length')(_.get(compName, result)) / 2)(_.get(compName, result)) };
         }
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
+        const memoizeWithResolver = _.memoize.convert({ fixed: false });
+        const selectRecordsFunc = memoizeWithResolver(selectRecords, (...args) => JSON.stringify(args));
         return chain(
-            () => getUpstreamRecords(comp, comp.name),
-            (result) => getDownstreamRecords(comp, comp.name, result),
+            () => getUpstreamRecords(comp, comp.name, {}, selectRecordsFunc),
+            (result) => getDownstreamRecords(comp, comp.name, result, selectRecordsFunc),
             (result) => removeDuplicates(result, comp.name)
         );
     };
