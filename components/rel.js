@@ -10,13 +10,13 @@ function rel(compName = 'rel') {
             if (!exists) {
                 return knex.schema.createTable(tableName, function (table) {
                     table.increments('id').primary();
-                    table.string('sourceComp').notNullable();
-                    table.integer('sourceId').notNullable();
-                    table.string('targetComp').notNullable();
-                    table.integer('targetId').notNullable();
-                    table.timestamps(false, true, true);
-                    table.unique(['sourceComp', 'sourceId', 'targetComp', 'targetId']);
-                    table.index(['targetComp', 'targetId']);
+                    table.string('source_comp').notNullable();
+                    table.integer('source_id').notNullable();
+                    table.string('target_comp').notNullable();
+                    table.integer('target_id').notNullable();
+                    table.timestamps(false, true);
+                    table.unique(['source_comp', 'source_id', 'target_comp', 'target_id']);
+                    table.index(['target_comp', 'target_id']);
                 });
             }
         },
@@ -27,13 +27,13 @@ function rel(compName = 'rel') {
         const compObject = Object.create(compSchema);
         compObject.data = () => {
             return {
-                [compName]: {
-                    id,
-                    sourceComp,
-                    sourceId,
-                    targetComp,
-                    targetId,
-                },
+                id,
+                source_comp: sourceComp,
+                source_id: sourceId,
+                target_comp: targetComp,
+                target_id: targetId,
+                created_at: undefined,
+                updated_at: undefined,
             };
         };
         return compObject;

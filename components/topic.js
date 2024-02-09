@@ -10,9 +10,9 @@ function topic(compName = 'topic') {
             if (!exists) {
                 return knex.schema.createTable(tableName, function (table) {
                     table.increments('id').primary();
-                    table.text('topicTitle').notNullable();
-                    table.timestamps(false, true, true);
-                    table.index('updatedAt');
+                    table.text('topic_title').notNullable();
+                    table.timestamps(false, true);
+                    table.index('updated_at');
                 });
             }
         },
@@ -23,10 +23,10 @@ function topic(compName = 'topic') {
         const compObject = Object.create(compSchema);
         compObject.data = () => {
             return {
-                [compName]: {
-                    id,
-                    topicTitle,
-                },
+                id,
+                topic_title: topicTitle,
+                created_at: undefined,
+                updated_at: undefined,
             };
         };
         return compObject;

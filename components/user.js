@@ -12,7 +12,7 @@ function user(compName = 'user') {
                     table.increments('id').primary();
                     table.string('username').notNullable();
                     table.string('email').notNullable();
-                    table.timestamps(false, true, true);
+                    table.timestamps(false, true);
                     table.unique('email');
                 });
             }
@@ -24,11 +24,11 @@ function user(compName = 'user') {
         const compObject = Object.create(compSchema);
         compObject.data = () => {
             return {
-                [compName]: {
-                    id,
-                    username,
-                    email,
-                },
+                id,
+                username,
+                email,
+                created_at: undefined,
+                updated_at: undefined,
             };
         };
         return compObject;

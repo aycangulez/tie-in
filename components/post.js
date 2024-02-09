@@ -10,8 +10,8 @@ function post(compName = 'post') {
             if (!exists) {
                 return knex.schema.createTable(tableName, function (table) {
                     table.increments('id').primary();
-                    table.text('postText').notNullable();
-                    table.timestamps(false, true, true);
+                    table.text('post_text').notNullable();
+                    table.timestamps(false, true);
                 });
             }
         },
@@ -22,10 +22,10 @@ function post(compName = 'post') {
         const compObject = Object.create(compSchema);
         compObject.data = () => {
             return {
-                [compName]: {
-                    id,
-                    postText,
-                },
+                id,
+                post_text: postText,
+                created_at: undefined,
+                updated_at: undefined,
             };
         };
         return compObject;
