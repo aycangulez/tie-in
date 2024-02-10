@@ -10,7 +10,7 @@ function topic(compName = 'topic') {
             if (!exists) {
                 return knex.schema.createTable(tableName, function (table) {
                     table.increments('id').primary();
-                    table.text('topic_title').notNullable();
+                    table.text('title').notNullable();
                     table.timestamps(false, true);
                     table.index('updated_at');
                 });
@@ -18,13 +18,13 @@ function topic(compName = 'topic') {
         },
     };
 
-    return function (id, topicTitle) {
+    return function (id, title) {
         is.valid(is.maybeNumber, is.maybeString, arguments);
         const compObject = Object.create(compSchema);
         compObject.data = () => {
             return {
                 id,
-                topic_title: topicTitle,
+                title,
                 created_at: undefined,
                 updated_at: undefined,
             };

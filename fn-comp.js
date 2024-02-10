@@ -88,15 +88,18 @@ const fnComp = function (knex, tablePrefix = '') {
         return sourceId;
     }
 
-    async function getUpstreamRecords(comp, rootCompName, result = {}, selectRecordsFunc = selectRecords) {
-        is.valid(is.objectWithProps(compProps), is.string, is.maybeObject, is.maybeFunc, arguments);
+    async function getUpstreamRecords(comp, rootCompName, result = {}, level = 0, filters, selectRecordsFunc) {
+        is.valid(is.objectWithProps(compProps), is.string, is.object, is.number, is.object, is.func, arguments);
         const compRecs = await selectRecordsFunc(comp.name, comp.data());
+        const levelLimit = _.isUndefined(filters.upstreamLimit) ? -1 : filters.upstreamLimit;
         if (!result[comp.name]) {
             result[comp.name] = [];
         }
         for (let i = 0, cLen = compRecs.length; i < cLen; i++) {
             result[comp.name].push({ self: compRecs[i] });
-
+            if (levelLimit === level) {
+                continue;
+            }
             let relComp = rel(undefined, undefined, undefined, comp.name, compRecs[i].id);
             let relRecs = await selectRecordsFunc(relComp.name, relComp.data());
 
@@ -111,6 +114,8 @@ const fnComp = function (knex, tablePrefix = '') {
                     sourceComp,
                     rootCompName,
                     result[comp.name][i],
+                    level + 1,
+                    filters,
                     selectRecordsFunc
                 );
             }
@@ -118,15 +123,18 @@ const fnComp = function (knex, tablePrefix = '') {
         return result;
     }
 
-    async function getDownstreamRecords(comp, rootCompName, result = {}, selectRecordsFunc = selectRecords) {
-        is.valid(is.objectWithProps(compProps), is.string, is.maybeObject, is.maybeFunc, arguments);
+    async function getDownstreamRecords(comp, rootCompName, result = {}, level = 0, filters, selectRecordsFunc) {
+        is.valid(is.objectWithProps(compProps), is.string, is.object, is.number, is.object, is.func, arguments);
         const compRecs = await selectRecordsFunc(comp.name, comp.data());
+        const levelLimit = _.isUndefined(filters.downstreamLimit) ? -1 : filters.downstreamLimit;
         if (!result[comp.name]) {
             result[comp.name] = [];
         }
         for (let i = 0, cLen = compRecs.length; i < cLen; i++) {
             result[comp.name].push({ self: compRecs[i] });
-
+            if (levelLimit === level) {
+                continue;
+            }
             let relComp = rel(undefined, comp.name, compRecs[i].id);
             let relRecs = await selectRecordsFunc(relComp.name, relComp.data());
 
@@ -141,6 +149,8 @@ const fnComp = function (knex, tablePrefix = '') {
                     targetComp,
                     rootCompName,
                     result[comp.name][i],
+                    level + 1,
+                    filters,
                     selectRecordsFunc
                 );
             }
@@ -170,8 +180,8 @@ const fnComp = function (knex, tablePrefix = '') {
         const memoizeWithResolver = _.memoize.convert({ fixed: false });
         const selectRecordsFunc = memoizeWithResolver(selectRecords, (...args) => JSON.stringify(args));
         return chain(
-            () => getUpstreamRecords(comp, comp.name, {}, selectRecordsFunc),
-            (result) => getDownstreamRecords(comp, comp.name, result, selectRecordsFunc),
+            () => getUpstreamRecords(comp, comp.name, {}, 0, filters, selectRecordsFunc),
+            (result) => getDownstreamRecords(comp, comp.name, result, 0, filters, selectRecordsFunc),
             (result) => removeDuplicates(result, comp.name)
         );
     };

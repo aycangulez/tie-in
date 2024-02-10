@@ -10,20 +10,20 @@ function post(compName = 'post') {
             if (!exists) {
                 return knex.schema.createTable(tableName, function (table) {
                     table.increments('id').primary();
-                    table.text('post_text').notNullable();
+                    table.text('content').notNullable();
                     table.timestamps(false, true);
                 });
             }
         },
     };
 
-    return function (id, postText) {
+    return function (id, content) {
         is.valid(is.maybeNumber, is.maybeString, arguments);
         const compObject = Object.create(compSchema);
         compObject.data = () => {
             return {
                 id,
-                post_text: postText,
+                content,
                 created_at: undefined,
                 updated_at: undefined,
             };
