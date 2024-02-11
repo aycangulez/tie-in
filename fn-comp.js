@@ -40,6 +40,53 @@ const fnComp = function (knex, tablePrefix = '') {
             .limit(limit);
     }
 
+    async function selectRecordsByFilter(comp, filterComps, orderBy = 'id', trx = knex, offset = 0, limit = 10) {
+        is.valid(
+            is.objectWithProps(compProps),
+            is.array,
+            is.maybeString,
+            is.maybeObject,
+            is.maybeNumber,
+            is.maybeNumber,
+            arguments
+        );
+        return trx(tablePrefix + comp.name)
+            .select()
+            .columns(getColumnNames(comp.data()))
+            .whereExists(function () {
+                if (filterComps.length > 1) {
+                    this.intersect(
+                        (function () {
+                            let queries = [];
+                            _.each((filterComp) =>
+                                queries.push(
+                                    trx
+                                        .from(tablePrefix + 'rel')
+                                        .select('rel.target_id')
+                                        .where('rel.source_comp', filterComp.name)
+                                        .andWhere('rel.source_id', _.get('id')(filterComp.data()))
+                                        .andWhere('rel.target_comp', comp.name)
+                                        .andWhereRaw('rel.target_id = ' + comp.name + '.id')
+                                )
+                            )(filterComps);
+                            return queries;
+                        })(),
+                        true
+                    );
+                } else {
+                    this.from(tablePrefix + 'rel')
+                        .select('rel.target_id')
+                        .where('rel.source_comp', filterComps[0].name)
+                        .andWhere('rel.source_id', _.get('id')(filterComps[0].data()))
+                        .andWhere('rel.target_comp', comp.name)
+                        .andWhereRaw('rel.target_id = ' + comp.name + '.id');
+                }
+            })
+            .orderBy(orderBy)
+            .offset(offset)
+            .limit(limit);
+    }
+
     async function checkRelSources(relSources, trx = knex) {
         is.valid(is.maybeArray, is.maybeObject, arguments);
         const sourcePromises = _.map((v) => selectRecords(v.name, v.data(), trx))(relSources);
@@ -88,9 +135,36 @@ const fnComp = function (knex, tablePrefix = '') {
         return sourceId;
     }
 
-    async function getUpstreamRecords(comp, rootCompName, result = {}, level = 0, filters, selectRecordsFunc) {
-        is.valid(is.objectWithProps(compProps), is.string, is.object, is.number, is.object, is.func, arguments);
-        const compRecs = await selectRecordsFunc(comp.name, comp.data());
+    async function getUpstreamRecords(
+        comp,
+        rootCompName,
+        result = {},
+        level = 0,
+        filters,
+        selectRecordsFunc,
+        selectRecordsByFilterFunc
+    ) {
+        is.valid(
+            is.objectWithProps(compProps),
+            is.string,
+            is.object,
+            is.number,
+            is.object,
+            is.func,
+            is.func,
+            arguments
+        );
+        const compRecs =
+            level === 0 && filters.filterUpstreamBy
+                ? await selectRecordsByFilterFunc(
+                      comp,
+                      filters.filterUpstreamBy,
+                      filters.orderBy,
+                      knex,
+                      filters.offset,
+                      filters.limit
+                  )
+                : await selectRecordsFunc(comp.name, comp.data(), knex, filters.offset, filters.limit);
         const levelLimit = _.isUndefined(filters.upstreamLimit) ? -1 : filters.upstreamLimit;
         if (!result[comp.name]) {
             result[comp.name] = [];
@@ -101,7 +175,7 @@ const fnComp = function (knex, tablePrefix = '') {
                 continue;
             }
             let relComp = rel(undefined, undefined, undefined, comp.name, compRecs[i].id);
-            let relRecs = await selectRecordsFunc(relComp.name, relComp.data());
+            let relRecs = await selectRecordsFunc(relComp.name, relComp.data(), knex, filters.offset, filters.limit);
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
                 let relRec = relRecs[j];
@@ -116,16 +190,44 @@ const fnComp = function (knex, tablePrefix = '') {
                     result[comp.name][i],
                     level + 1,
                     filters,
-                    selectRecordsFunc
+                    selectRecordsFunc,
+                    selectRecordsByFilterFunc
                 );
             }
         }
         return result;
     }
 
-    async function getDownstreamRecords(comp, rootCompName, result = {}, level = 0, filters, selectRecordsFunc) {
-        is.valid(is.objectWithProps(compProps), is.string, is.object, is.number, is.object, is.func, arguments);
-        const compRecs = await selectRecordsFunc(comp.name, comp.data());
+    async function getDownstreamRecords(
+        comp,
+        rootCompName,
+        result = {},
+        level = 0,
+        filters,
+        selectRecordsFunc,
+        selectRecordsByFilterFunc
+    ) {
+        is.valid(
+            is.objectWithProps(compProps),
+            is.string,
+            is.object,
+            is.number,
+            is.object,
+            is.func,
+            is.func,
+            arguments
+        );
+        const compRecs =
+            level === 0 && filters.filterUpstreamBy
+                ? await selectRecordsByFilterFunc(
+                      comp,
+                      filters.filterUpstreamBy,
+                      filters.orderBy,
+                      knex,
+                      filters.offset,
+                      filters.limit
+                  )
+                : await selectRecordsFunc(comp.name, comp.data(), knex, filters.offset, filters.limit);
         const levelLimit = _.isUndefined(filters.downstreamLimit) ? -1 : filters.downstreamLimit;
         if (!result[comp.name]) {
             result[comp.name] = [];
@@ -136,7 +238,7 @@ const fnComp = function (knex, tablePrefix = '') {
                 continue;
             }
             let relComp = rel(undefined, comp.name, compRecs[i].id);
-            let relRecs = await selectRecordsFunc(relComp.name, relComp.data());
+            let relRecs = await selectRecordsFunc(relComp.name, relComp.data(), knex, filters.offset, filters.limit);
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
                 let relRec = relRecs[j];
@@ -151,7 +253,8 @@ const fnComp = function (knex, tablePrefix = '') {
                     result[comp.name][i],
                     level + 1,
                     filters,
-                    selectRecordsFunc
+                    selectRecordsFunc,
+                    selectRecordsByFilterFunc
                 );
             }
         }
@@ -179,9 +282,11 @@ const fnComp = function (knex, tablePrefix = '') {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
         const memoizeWithResolver = _.memoize.convert({ fixed: false });
         const selectRecordsFunc = memoizeWithResolver(selectRecords, (...args) => JSON.stringify(args));
+        const selectRecordsByFilterFunc = memoizeWithResolver(selectRecordsByFilter, (...args) => JSON.stringify(args));
         return chain(
-            () => getUpstreamRecords(comp, comp.name, {}, 0, filters, selectRecordsFunc),
-            (result) => getDownstreamRecords(comp, comp.name, result, 0, filters, selectRecordsFunc),
+            () => getUpstreamRecords(comp, comp.name, {}, 0, filters, selectRecordsFunc, selectRecordsByFilterFunc),
+            (result) =>
+                getDownstreamRecords(comp, comp.name, result, 0, filters, selectRecordsFunc, selectRecordsByFilterFunc),
             (result) => removeDuplicates(result, comp.name)
         );
     };
