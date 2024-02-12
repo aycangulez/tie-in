@@ -138,23 +138,13 @@ const fnComp = function (knex, tablePrefix = '') {
 
     async function getUpstreamRecords(
         comp,
-        rootCompName,
         result = {},
         level = 0,
         filters,
         selectRecordsFunc,
         selectRecordsByFilterFunc
     ) {
-        is.valid(
-            is.objectWithProps(compProps),
-            is.string,
-            is.object,
-            is.number,
-            is.object,
-            is.func,
-            is.func,
-            arguments
-        );
+        is.valid(is.objectWithProps(compProps), is.object, is.number, is.object, is.func, is.func, arguments);
         const compRecs =
             level === 0 && filters.filterUpstreamBy
                 ? await selectRecordsByFilterFunc(
@@ -166,13 +156,12 @@ const fnComp = function (knex, tablePrefix = '') {
                       filters.filterUpstreamBy.limit
                   )
                 : await selectRecordsFunc(comp.name, comp.data(), knex, filters.orderBy, filters.offset, filters.limit);
-        const levelLimit = _.isUndefined(filters.upstreamLimit) ? -1 : filters.upstreamLimit;
         if (!result[comp.name]) {
             result[comp.name] = [];
         }
         for (let i = 0, cLen = compRecs.length; i < cLen; i++) {
             result[comp.name].push({ self: compRecs[i] });
-            if (levelLimit === level) {
+            if (level === filters.upstreamLimit) {
                 continue;
             }
             let relComp = rel(undefined, undefined, undefined, comp.name, compRecs[i].id);
@@ -187,14 +176,9 @@ const fnComp = function (knex, tablePrefix = '') {
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
                 let relRec = relRecs[j];
-                if (relRec.sourceComp === rootCompName) {
-                    continue;
-                }
-
                 let sourceComp = comps[relRec.sourceComp](relRec.sourceId);
                 result[comp.name][i] = await getUpstreamRecords(
                     sourceComp,
-                    rootCompName,
                     result[comp.name][i],
                     level + 1,
                     filters,
@@ -208,23 +192,13 @@ const fnComp = function (knex, tablePrefix = '') {
 
     async function getDownstreamRecords(
         comp,
-        rootCompName,
         result = {},
         level = 0,
         filters,
         selectRecordsFunc,
         selectRecordsByFilterFunc
     ) {
-        is.valid(
-            is.objectWithProps(compProps),
-            is.string,
-            is.object,
-            is.number,
-            is.object,
-            is.func,
-            is.func,
-            arguments
-        );
+        is.valid(is.objectWithProps(compProps), is.object, is.number, is.object, is.func, is.func, arguments);
         const compRecs =
             level === 0 && filters.filterUpstreamBy
                 ? await selectRecordsByFilterFunc(
@@ -236,13 +210,12 @@ const fnComp = function (knex, tablePrefix = '') {
                       filters.filterUpstreamBy.limit
                   )
                 : await selectRecordsFunc(comp.name, comp.data(), knex, filters.offset, filters.limit);
-        const levelLimit = _.isUndefined(filters.downstreamLimit) ? -1 : filters.downstreamLimit;
         if (!result[comp.name]) {
             result[comp.name] = [];
         }
         for (let i = 0, cLen = compRecs.length; i < cLen; i++) {
             result[comp.name].push({ self: compRecs[i] });
-            if (levelLimit === level) {
+            if (level === filters.downstreamLimit) {
                 continue;
             }
             let relComp = rel(undefined, comp.name, compRecs[i].id);
@@ -250,14 +223,9 @@ const fnComp = function (knex, tablePrefix = '') {
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
                 let relRec = relRecs[j];
-                if (relRec.targetComp === rootCompName) {
-                    continue;
-                }
-
                 let targetComp = comps[relRec.targetComp](relRec.targetId);
                 result[comp.name][i] = await getDownstreamRecords(
                     targetComp,
-                    rootCompName,
                     result[comp.name][i],
                     level + 1,
                     filters,
@@ -288,12 +256,13 @@ const fnComp = function (knex, tablePrefix = '') {
             return { [compName]: _.slice(0, _.get('length')(_.get(compName, result)) / 2)(_.get(compName, result)) };
         }
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
+        filters.upstreamLimit = filters.upstreamLimit || 10;
+        filters.downstreamLimit = filters.downstreamLimit || 10;
         const selectRecordsFunc = memoizeWithResolver(selectRecords, (...args) => JSON.stringify(args));
         const selectRecordsByFilterFunc = memoizeWithResolver(selectRecordsByFilter, (...args) => JSON.stringify(args));
         return chain(
-            () => getUpstreamRecords(comp, comp.name, {}, 0, filters, selectRecordsFunc, selectRecordsByFilterFunc),
-            (result) =>
-                getDownstreamRecords(comp, comp.name, result, 0, filters, selectRecordsFunc, selectRecordsByFilterFunc),
+            () => getUpstreamRecords(comp, {}, 0, filters, selectRecordsFunc, selectRecordsByFilterFunc),
+            (result) => getDownstreamRecords(comp, result, 0, filters, selectRecordsFunc, selectRecordsByFilterFunc),
             (result) => removeDuplicates(result, comp.name)
         );
     };
