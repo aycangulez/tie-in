@@ -3,6 +3,7 @@ const chain = require('fn-one');
 const fn = require('fn-tester');
 const { is } = require('./helper');
 const rel = require('./components/rel')();
+const memoizeWithResolver = _.memoize.convert({ fixed: false });
 
 const fnComp = function (knex, tablePrefix = '') {
     is.valid(is.object, is.maybeString, arguments);
@@ -158,11 +159,11 @@ const fnComp = function (knex, tablePrefix = '') {
             level === 0 && filters.filterUpstreamBy
                 ? await selectRecordsByFilterFunc(
                       comp,
-                      filters.filterUpstreamBy,
-                      filters.orderBy,
+                      filters.filterUpstreamBy.comp,
+                      filters.filterUpstreamBy.orderBy,
                       knex,
-                      filters.offset,
-                      filters.limit
+                      filters.filterUpstreamBy.offset,
+                      filters.filterUpstreamBy.limit
                   )
                 : await selectRecordsFunc(comp.name, comp.data(), knex, filters.offset, filters.limit);
         const levelLimit = _.isUndefined(filters.upstreamLimit) ? -1 : filters.upstreamLimit;
@@ -221,11 +222,11 @@ const fnComp = function (knex, tablePrefix = '') {
             level === 0 && filters.filterUpstreamBy
                 ? await selectRecordsByFilterFunc(
                       comp,
-                      filters.filterUpstreamBy,
-                      filters.orderBy,
+                      filters.filterUpstreamBy.comp,
+                      filters.filterUpstreamBy.orderBy,
                       knex,
-                      filters.offset,
-                      filters.limit
+                      filters.filterUpstreamBy.offset,
+                      filters.filterUpstreamBy.limit
                   )
                 : await selectRecordsFunc(comp.name, comp.data(), knex, filters.offset, filters.limit);
         const levelLimit = _.isUndefined(filters.downstreamLimit) ? -1 : filters.downstreamLimit;
@@ -280,7 +281,6 @@ const fnComp = function (knex, tablePrefix = '') {
             return { [compName]: _.slice(0, _.get('length')(_.get(compName, result)) / 2)(_.get(compName, result)) };
         }
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
-        const memoizeWithResolver = _.memoize.convert({ fixed: false });
         const selectRecordsFunc = memoizeWithResolver(selectRecords, (...args) => JSON.stringify(args));
         const selectRecordsByFilterFunc = memoizeWithResolver(selectRecordsByFilter, (...args) => JSON.stringify(args));
         return chain(
