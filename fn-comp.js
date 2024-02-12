@@ -30,22 +30,22 @@ const fnComp = function (knex, tablePrefix = '') {
             .then(_.flow(_.head, _.get('id')));
     }
 
-    async function selectRecords(compName, compData, trx = knex, offset = 0, limit = 10) {
-        is.valid(is.string, is.object, is.maybeObject, is.maybeNumber, is.maybeNumber, arguments);
+    async function selectRecords(compName, compData, trx = knex, orderBy = ['id'], offset = 0, limit = 10) {
+        is.valid(is.string, is.object, is.maybeObject, is.maybeArray, is.maybeNumber, is.maybeNumber, arguments);
         return trx(tablePrefix + compName)
             .select()
             .columns(getColumnNames(compData))
             .where(compact(compData))
-            .orderBy('id')
+            .orderBy(...orderBy)
             .offset(offset)
             .limit(limit);
     }
 
-    async function selectRecordsByFilter(comp, filterComps, orderBy = 'id', trx = knex, offset = 0, limit = 10) {
+    async function selectRecordsByFilter(comp, filterComps, orderBy = ['id'], trx = knex, offset = 0, limit = 10) {
         is.valid(
             is.objectWithProps(compProps),
             is.array,
-            is.maybeString,
+            is.maybeArray,
             is.maybeObject,
             is.maybeNumber,
             is.maybeNumber,
@@ -83,7 +83,7 @@ const fnComp = function (knex, tablePrefix = '') {
                         .andWhereRaw('rel.target_id = ' + comp.name + '.id');
                 }
             })
-            .orderBy(orderBy)
+            .orderBy(...orderBy)
             .offset(offset)
             .limit(limit);
     }
@@ -165,7 +165,7 @@ const fnComp = function (knex, tablePrefix = '') {
                       filters.filterUpstreamBy.offset,
                       filters.filterUpstreamBy.limit
                   )
-                : await selectRecordsFunc(comp.name, comp.data(), knex, filters.offset, filters.limit);
+                : await selectRecordsFunc(comp.name, comp.data(), knex, filters.orderBy, filters.offset, filters.limit);
         const levelLimit = _.isUndefined(filters.upstreamLimit) ? -1 : filters.upstreamLimit;
         if (!result[comp.name]) {
             result[comp.name] = [];
@@ -176,7 +176,14 @@ const fnComp = function (knex, tablePrefix = '') {
                 continue;
             }
             let relComp = rel(undefined, undefined, undefined, comp.name, compRecs[i].id);
-            let relRecs = await selectRecordsFunc(relComp.name, relComp.data(), knex, filters.offset, filters.limit);
+            let relRecs = await selectRecordsFunc(
+                relComp.name,
+                relComp.data(),
+                knex,
+                filters.orderBy,
+                filters.offset,
+                filters.limit
+            );
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
                 let relRec = relRecs[j];
