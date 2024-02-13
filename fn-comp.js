@@ -1,6 +1,5 @@
 const _ = require('lodash/fp');
 const chain = require('fn-one');
-const fn = require('fn-tester');
 const { is } = require('./helper');
 const rel = require('./components/rel')();
 const memoizeWithResolver = _.memoize.convert({ fixed: false });
@@ -22,20 +21,27 @@ const fnComp = function (knex, tablePrefix = '') {
         return colNames;
     }
 
-    async function insertRecord(compName, compData, trx = knex) {
-        is.valid(is.string, is.object, is.maybeObject, arguments);
-        return trx(tablePrefix + compName)
-            .insert(compact(compData))
+    async function insertRecord(comp, trx = knex) {
+        is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
+        return trx(tablePrefix + comp.name)
+            .insert(compact(comp.data()))
             .returning('id')
             .then(_.flow(_.head, _.get('id')));
     }
 
-    async function selectRecords(compName, compData, trx = knex, orderBy = ['id'], offset = 0, limit = 10) {
-        is.valid(is.string, is.object, is.maybeObject, is.maybeArray, is.maybeNumber, is.maybeNumber, arguments);
-        return trx(tablePrefix + compName)
+    async function selectRecords(comp, trx = knex, orderBy = ['id'], offset = 0, limit = 10) {
+        is.valid(
+            is.objectWithProps(compProps),
+            is.maybeObject,
+            is.maybeArray,
+            is.maybeNumber,
+            is.maybeNumber,
+            arguments
+        );
+        return trx(tablePrefix + comp.name)
             .select()
-            .columns(getColumnNames(compData))
-            .where(compact(compData))
+            .columns(getColumnNames(comp.data()))
+            .where(compact(comp.data()))
             .orderBy(...orderBy)
             .offset(offset)
             .limit(limit);
@@ -90,7 +96,7 @@ const fnComp = function (knex, tablePrefix = '') {
 
     async function checkRelSources(relSources, trx = knex) {
         is.valid(is.maybeArray, is.maybeObject, arguments);
-        const sourcePromises = _.map((v) => selectRecords(v.name, v.data(), trx))(relSources);
+        const sourcePromises = _.map((v) => selectRecords(v, trx))(relSources);
         const sourceRecs = await Promise.all(sourcePromises);
         const numSourcesReturned = _.flow(_.compact, _.get('length'))(sourceRecs);
         if (numSourcesReturned < _.get('length')(relSources)) {
@@ -104,11 +110,7 @@ const fnComp = function (knex, tablePrefix = '') {
         _.each((relSource) => {
             let relComp = rel(undefined, relSource.name, _.get('id')(relSource.data()), targetComp, targetId);
             promises.push(() =>
-                fn
-                    .run(selectRecords, null, relComp.name, relComp.data(), trx)
-                    .then((result) =>
-                        _.head(result) ? false : fn.run(insertRecord, null, relComp.name, relComp.data(), trx)
-                    )
+                selectRecords(relComp, trx).then((result) => (_.head(result) ? false : insertRecord(relComp, trx)))
             );
         })(relSources);
         for (let p in promises) {
@@ -123,11 +125,7 @@ const fnComp = function (knex, tablePrefix = '') {
         _.each((relTarget) => {
             let relComp = rel(undefined, sourceComp, sourceId, relTarget.name, _.get('id')(relTarget.data()));
             promises.push(() =>
-                fn
-                    .run(selectRecords, null, relComp.name, relComp.data(), trx)
-                    .then((result) =>
-                        _.head(result) ? false : fn.run(insertRecord, null, relComp.name, relComp.data(), trx)
-                    )
+                selectRecords(relComp, trx).then((result) => (_.head(result) ? false : insertRecord(relComp, trx)))
             );
         })(relTargets);
         for (let p in promises) {
@@ -155,7 +153,7 @@ const fnComp = function (knex, tablePrefix = '') {
                       filters.filterUpstreamBy.offset,
                       filters.filterUpstreamBy.limit
                   )
-                : await selectRecordsFunc(comp.name, comp.data(), knex, filters.orderBy, filters.offset, filters.limit);
+                : await selectRecordsFunc(comp, knex, filters.orderBy, filters.offset, filters.limit);
         if (!result[comp.name]) {
             result[comp.name] = [];
         }
@@ -165,14 +163,7 @@ const fnComp = function (knex, tablePrefix = '') {
                 continue;
             }
             let relComp = rel(undefined, undefined, undefined, comp.name, compRecs[i].id);
-            let relRecs = await selectRecordsFunc(
-                relComp.name,
-                relComp.data(),
-                knex,
-                filters.orderBy,
-                filters.offset,
-                filters.limit
-            );
+            let relRecs = await selectRecordsFunc(relComp, knex, filters.orderBy, filters.offset, filters.limit);
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
                 let relRec = relRecs[j];
@@ -209,7 +200,7 @@ const fnComp = function (knex, tablePrefix = '') {
                       filters.filterUpstreamBy.offset,
                       filters.filterUpstreamBy.limit
                   )
-                : await selectRecordsFunc(comp.name, comp.data(), knex, filters.offset, filters.limit);
+                : await selectRecordsFunc(comp, knex, filters.offset, filters.limit);
         if (!result[comp.name]) {
             result[comp.name] = [];
         }
@@ -219,7 +210,7 @@ const fnComp = function (knex, tablePrefix = '') {
                 continue;
             }
             let relComp = rel(undefined, comp.name, compRecs[i].id);
-            let relRecs = await selectRecordsFunc(relComp.name, relComp.data(), knex, filters.offset, filters.limit);
+            let relRecs = await selectRecordsFunc(relComp, knex, filters.offset, filters.limit);
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
                 let relRec = relRecs[j];
@@ -242,10 +233,10 @@ const fnComp = function (knex, tablePrefix = '') {
         return await knex.transaction(
             async (trx) =>
                 await chain(
-                    () => fn.run(checkRelSources, null, _.concat(upstreamRelSources, downstreamRelTargets), trx),
-                    () => fn.run(insertRecord, null, comp.name, comp.data(), trx),
-                    (id) => fn.run(insertUpstreamRels, null, upstreamRelSources, comp.name, id, trx),
-                    (id) => fn.run(insertDownstreamRels, null, downstreamRelTargets, comp.name, id, trx)
+                    () => checkRelSources(_.concat(upstreamRelSources, downstreamRelTargets), trx),
+                    () => insertRecord(comp, trx),
+                    (id) => insertUpstreamRels(upstreamRelSources, comp.name, id, trx),
+                    (id) => insertDownstreamRels(downstreamRelTargets, comp.name, id, trx)
                 )
         );
     };
@@ -258,8 +249,9 @@ const fnComp = function (knex, tablePrefix = '') {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
         filters.upstreamLimit = filters.upstreamLimit || 10;
         filters.downstreamLimit = filters.downstreamLimit || 10;
-        const selectRecordsFunc = memoizeWithResolver(selectRecords, (...args) => JSON.stringify(args));
-        const selectRecordsByFilterFunc = memoizeWithResolver(selectRecordsByFilter, (...args) => JSON.stringify(args));
+        const resolverFunc = (comp, ...args) => JSON.stringify([comp.name, comp.data(), args]);
+        const selectRecordsFunc = memoizeWithResolver(selectRecords, resolverFunc);
+        const selectRecordsByFilterFunc = memoizeWithResolver(selectRecordsByFilter, resolverFunc);
         return chain(
             () => getUpstreamRecords(comp, {}, 0, filters, selectRecordsFunc, selectRecordsByFilterFunc),
             (result) => getDownstreamRecords(comp, result, 0, filters, selectRecordsFunc, selectRecordsByFilterFunc),
@@ -274,8 +266,6 @@ const fnComp = function (knex, tablePrefix = '') {
         await Promise.all(componetSchemas);
         _.each((comp) => (comps[comp().name] = comp))(compCollection);
     };
-
-    this.fn = fn;
 
     return this;
 };
