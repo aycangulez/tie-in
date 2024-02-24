@@ -163,7 +163,7 @@ const fnComp = function (knex, tablePrefix = '') {
                 continue;
             }
             let relComp = rel(undefined, undefined, undefined, comp.name, compRecs[i].id);
-            let relRecs = await selectRecordsFunc(relComp, knex, filters.orderBy, 0, -1);
+            let relRecs = await selectRecordsFunc(relComp, knex, ['id'], 0, -1);
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
                 let relRec = relRecs[j];
@@ -210,7 +210,7 @@ const fnComp = function (knex, tablePrefix = '') {
                 continue;
             }
             let relComp = rel(undefined, comp.name, compRecs[i].id);
-            let relRecs = await selectRecordsFunc(relComp, knex, filters.orderBy, 0, -1);
+            let relRecs = await selectRecordsFunc(relComp, knex, ['id'], 0, -1);
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
                 let relRec = relRecs[j];
