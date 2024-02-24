@@ -44,7 +44,7 @@ const fnComp = function (knex, tablePrefix = '') {
             .where(compact(comp.data()))
             .orderBy(...orderBy)
             .offset(offset)
-            .limit(limit);
+            .limit(limit === -1 ? 1000000000 : limit);
     }
 
     async function selectRecordsByFilter(comp, filterComps, orderBy = ['id'], trx = knex, offset = 0, limit = 10) {
@@ -163,7 +163,7 @@ const fnComp = function (knex, tablePrefix = '') {
                 continue;
             }
             let relComp = rel(undefined, undefined, undefined, comp.name, compRecs[i].id);
-            let relRecs = await selectRecordsFunc(relComp, knex, filters.orderBy, filters.offset, filters.limit);
+            let relRecs = await selectRecordsFunc(relComp, knex, filters.orderBy, 0, -1);
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
                 let relRec = relRecs[j];
@@ -210,7 +210,7 @@ const fnComp = function (knex, tablePrefix = '') {
                 continue;
             }
             let relComp = rel(undefined, comp.name, compRecs[i].id);
-            let relRecs = await selectRecordsFunc(relComp, knex, filters.offset, filters.limit);
+            let relRecs = await selectRecordsFunc(relComp, knex, filters.orderBy, 0, -1);
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
                 let relRec = relRecs[j];
