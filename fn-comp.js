@@ -94,6 +94,14 @@ const fnComp = function (knex, tablePrefix = '') {
             .limit(limit);
     }
 
+    async function selectRecordsById(comp, ids, trx = knex) {
+        is.valid(is.objectWithProps(compProps), is.array, is.maybeObject, arguments);
+        return trx(tablePrefix + comp.name)
+            .select()
+            .columns(getColumnNames(comp.data()))
+            .whereIn('id', ids);
+    }
+
     async function checkRelSources(relSources, trx = knex) {
         is.valid(is.maybeArray, is.maybeObject, arguments);
         const sourcePromises = _.map((v) => selectRecords(v, trx))(relSources);
@@ -140,11 +148,13 @@ const fnComp = function (knex, tablePrefix = '') {
         level = 0,
         filters,
         selectRecordsFunc,
-        selectRecordsByFilterFunc
+        selectRecordsByFilterFunc,
+        saveCallsFunc
     ) {
-        is.valid(is.objectWithProps(compProps), is.object, is.number, is.object, is.func, is.func, arguments);
-        const compRecs =
-            level === 0 && filters.filterUpstreamBy
+        is.valid(is.objectWithProps(compProps), is.object, is.number, is.object, is.func, is.func, is.func, arguments);
+        let compRecs;
+        if (level === 0) {
+            compRecs = filters.filterUpstreamBy
                 ? await selectRecordsByFilterFunc(
                       comp,
                       filters.filterUpstreamBy.comp,
@@ -154,6 +164,10 @@ const fnComp = function (knex, tablePrefix = '') {
                       filters.filterUpstreamBy.limit
                   )
                 : await selectRecordsFunc(comp, knex, filters.orderBy, filters.offset, filters.limit);
+        } else {
+            compRecs = [{ id: comp.data().id, _unresolved: comp.name }];
+            saveCallsFunc(comp);
+        }
         if (!result[comp.name]) {
             result[comp.name] = [];
         }
@@ -174,7 +188,8 @@ const fnComp = function (knex, tablePrefix = '') {
                     level + 1,
                     filters,
                     selectRecordsFunc,
-                    selectRecordsByFilterFunc
+                    selectRecordsByFilterFunc,
+                    saveCallsFunc
                 );
             }
         }
@@ -187,11 +202,13 @@ const fnComp = function (knex, tablePrefix = '') {
         level = 0,
         filters,
         selectRecordsFunc,
-        selectRecordsByFilterFunc
+        selectRecordsByFilterFunc,
+        saveCallsFunc
     ) {
-        is.valid(is.objectWithProps(compProps), is.object, is.number, is.object, is.func, is.func, arguments);
-        const compRecs =
-            level === 0 && filters.filterUpstreamBy
+        is.valid(is.objectWithProps(compProps), is.object, is.number, is.object, is.func, is.func, is.func, arguments);
+        let compRecs;
+        if (level === 0) {
+            compRecs = filters.filterUpstreamBy
                 ? await selectRecordsByFilterFunc(
                       comp,
                       filters.filterUpstreamBy.comp,
@@ -201,6 +218,10 @@ const fnComp = function (knex, tablePrefix = '') {
                       filters.filterUpstreamBy.limit
                   )
                 : await selectRecordsFunc(comp, knex, filters.offset, filters.limit);
+        } else {
+            compRecs = [{ id: comp.data().id, _unresolved: comp.name }];
+            saveCallsFunc(comp);
+        }
         if (!result[comp.name]) {
             result[comp.name] = [];
         }
@@ -221,10 +242,29 @@ const fnComp = function (knex, tablePrefix = '') {
                     level + 1,
                     filters,
                     selectRecordsFunc,
-                    selectRecordsByFilterFunc
+                    selectRecordsByFilterFunc,
+                    saveCallsFunc
                 );
             }
         }
+        return result;
+    }
+
+    function resolveRelatedCompRecords(result, relCompRecords) {
+        is.valid(is.object, is.array, arguments);
+        _.each((k) => {
+            if (_.isArray(result[k])) {
+                for (let i = 0, len = result[k].length; i < len; i++) {
+                    result[k][i] = resolveRelatedCompRecords(result[k][i], relCompRecords);
+                }
+            } else {
+                let unresolved = _.get('_unresolved')(result[k]);
+                if (unresolved) {
+                    let resolvedRecs = _.flow(_.find({ name: unresolved }), _.get('result'))(relCompRecords);
+                    result[k] = _.find({ id: _.get('id')(result[k]) })(resolvedRecs);
+                }
+            }
+        })(_.keys(result));
         return result;
     }
 
@@ -242,20 +282,42 @@ const fnComp = function (knex, tablePrefix = '') {
     };
 
     this.get = async function get(comp, filters = {}) {
+        is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
+        const compCalls = {};
+        function saveCalls(comp) {
+            is.valid(is.objectWithProps(compProps), arguments);
+            if (!compCalls[comp.name]) {
+                compCalls[comp.name] = [comp.data().id];
+            } else {
+                compCalls[comp.name].push(comp.data().id);
+            }
+        }
+        async function getRelatedCompRecords() {
+            return await Promise.all(
+                _.map((k) =>
+                    selectRecordsById(comps[k](), _.uniq(compCalls[k])).then((result) => ({ name: k, result }))
+                )(_.keys(compCalls))
+            );
+        }
         function removeDuplicates(result, compName) {
             is.valid(is.maybeObject, is.string, arguments);
             return { [compName]: _.slice(0, _.get('length')(_.get(compName, result)) / 2)(_.get(compName, result)) };
         }
-        is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
+
         filters.upstreamLimit = filters.upstreamLimit || 10;
         filters.downstreamLimit = filters.downstreamLimit || 10;
         const resolverFunc = (comp, ...args) => JSON.stringify([comp.name, comp.data(), args]);
         const selectRecordsFunc = memoizeWithResolver(selectRecords, resolverFunc);
         const selectRecordsByFilterFunc = memoizeWithResolver(selectRecordsByFilter, resolverFunc);
         return chain(
-            () => getUpstreamRecords(comp, {}, 0, filters, selectRecordsFunc, selectRecordsByFilterFunc),
-            (result) => getDownstreamRecords(comp, result, 0, filters, selectRecordsFunc, selectRecordsByFilterFunc),
-            (result) => removeDuplicates(result, comp.name)
+            () => getUpstreamRecords(comp, {}, 0, filters, selectRecordsFunc, selectRecordsByFilterFunc, saveCalls),
+            (result) =>
+                getDownstreamRecords(comp, result, 0, filters, selectRecordsFunc, selectRecordsByFilterFunc, saveCalls),
+            (result) => removeDuplicates(result, comp.name),
+            async (result) => {
+                relCompRecords = await getRelatedCompRecords();
+                return resolveRelatedCompRecords(result, relCompRecords);
+            }
         );
     };
 
