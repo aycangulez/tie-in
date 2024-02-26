@@ -21,14 +21,12 @@ function topic(compName = 'topic') {
     return function (id, title) {
         is.valid(is.maybeNumber, is.maybeString, arguments);
         const compObject = Object.create(compSchema);
-        compObject.data = () => {
-            return {
-                id,
-                title,
-                created_at: undefined,
-                updated_at: undefined,
-            };
-        };
+        compObject.data = () => ({
+            id,
+            title,
+            created_at: undefined,
+            updated_at: undefined,
+        });
         return compObject;
     };
 }

@@ -20,14 +20,12 @@ function post(compName = 'post') {
     return function (id, content) {
         is.valid(is.maybeNumber, is.maybeString, arguments);
         const compObject = Object.create(compSchema);
-        compObject.data = () => {
-            return {
-                id,
-                content,
-                created_at: undefined,
-                updated_at: undefined,
-            };
-        };
+        compObject.data = () => ({
+            id,
+            content,
+            created_at: undefined,
+            updated_at: undefined,
+        });
         return compObject;
     };
 }

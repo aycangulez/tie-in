@@ -25,17 +25,15 @@ function rel(compName = 'rel') {
     return function (id, sourceComp, sourceId, targetComp, targetId) {
         is.valid(is.maybeNumber, is.maybeString, is.maybeNumber, is.maybeString, is.maybeNumber, arguments);
         const compObject = Object.create(compSchema);
-        compObject.data = () => {
-            return {
-                id,
-                source_comp: sourceComp,
-                source_id: sourceId,
-                target_comp: targetComp,
-                target_id: targetId,
-                created_at: undefined,
-                updated_at: undefined,
-            };
-        };
+        compObject.data = () => ({
+            id,
+            source_comp: sourceComp,
+            source_id: sourceId,
+            target_comp: targetComp,
+            target_id: targetId,
+            created_at: undefined,
+            updated_at: undefined,
+        });
         return compObject;
     };
 }

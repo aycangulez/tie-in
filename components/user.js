@@ -22,15 +22,13 @@ function user(compName = 'user') {
     return function (id, username, email) {
         is.valid(is.maybeNumber, is.maybeString, is.maybeString, arguments);
         const compObject = Object.create(compSchema);
-        compObject.data = () => {
-            return {
-                id,
-                username,
-                email,
-                created_at: undefined,
-                updated_at: undefined,
-            };
-        };
+        compObject.data = () => ({
+            id,
+            username,
+            email,
+            created_at: undefined,
+            updated_at: undefined,
+        });
         return compObject;
     };
 }

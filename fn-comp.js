@@ -9,11 +9,13 @@ const fnComp = function (knex, tablePrefix = '') {
     var comps = {};
     const compProps = { name: is.string, data: is.func, schema: is.func };
 
+    // Removes columns with undefined values
     function compact(compData) {
         is.valid(is.object, arguments);
         return _.pickBy((v) => !_.isUndefined(v))(compData);
     }
 
+    // Aliases column names in camelCase
     function getColumnNames(compData) {
         is.valid(is.object, arguments);
         let colNames = {};
@@ -21,6 +23,7 @@ const fnComp = function (knex, tablePrefix = '') {
         return colNames;
     }
 
+    // Inserts a component record and returns its id
     async function insertRecord(comp, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
         return trx(tablePrefix + comp.name)
@@ -29,6 +32,7 @@ const fnComp = function (knex, tablePrefix = '') {
             .then(_.flow(_.head, _.get('id')));
     }
 
+    // Selects component records
     async function selectRecords(comp, trx = knex, orderBy = ['id'], offset = 0, limit = 10) {
         is.valid(
             is.objectWithProps(compProps),
@@ -47,6 +51,7 @@ const fnComp = function (knex, tablePrefix = '') {
             .limit(limit === -1 ? 1000000000 : limit);
     }
 
+    // Selects component records filtered by associated component records (effectively an inner join)
     async function selectRecordsByFilter(comp, filterComps, orderBy = ['id'], trx = knex, offset = 0, limit = 10) {
         is.valid(
             is.objectWithProps(compProps),
@@ -94,6 +99,7 @@ const fnComp = function (knex, tablePrefix = '') {
             .limit(limit);
     }
 
+    // Selects multiple records using a list of ids
     async function selectRecordsById(comp, ids, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.array, is.maybeObject, arguments);
         return trx(tablePrefix + comp.name)
@@ -102,6 +108,7 @@ const fnComp = function (knex, tablePrefix = '') {
             .whereIn('id', ids);
     }
 
+    // Checks if all given relations exist in the database
     async function checkRelSources(relSources, trx = knex) {
         is.valid(is.maybeArray, is.maybeObject, arguments);
         const sourcePromises = _.map((v) => selectRecords(v, trx))(relSources);
@@ -112,6 +119,7 @@ const fnComp = function (knex, tablePrefix = '') {
         }
     }
 
+    // Inserts given upstream relations for a component record
     async function insertUpstreamRels(relSources, targetComp, targetId, trx = knex) {
         is.valid(is.maybeArray, is.maybeString, is.maybeNumber, is.maybeObject, arguments);
         let promises = [];
@@ -127,6 +135,7 @@ const fnComp = function (knex, tablePrefix = '') {
         return targetId;
     }
 
+    // Inserts given downstream relations for a component record
     async function insertDownstreamRels(relTargets, sourceComp, sourceId, trx = knex) {
         is.valid(is.maybeArray, is.maybeString, is.maybeNumber, is.maybeObject, arguments);
         let promises = [];
@@ -137,11 +146,13 @@ const fnComp = function (knex, tablePrefix = '') {
             );
         })(relTargets);
         for (let p in promises) {
+            // Need to do inserts one by one in a transaction
             await promises[p]();
         }
         return sourceId;
     }
 
+    // Returns related upstream records for given component record(s), but doesn't immediately retrieve related record details
     async function getUpstreamRecords(
         comp,
         result = {},
@@ -196,6 +207,7 @@ const fnComp = function (knex, tablePrefix = '') {
         return result;
     }
 
+    // Returns related downstream records for given component record(s), but doesn't immediately retrieve related record details
     async function getDownstreamRecords(
         comp,
         result = {},
@@ -250,6 +262,7 @@ const fnComp = function (knex, tablePrefix = '') {
         return result;
     }
 
+    // Fills in the details of unresolved related component records
     function resolveRelatedCompRecords(result, relCompRecords) {
         is.valid(is.object, is.array, arguments);
         _.each((k) => {
@@ -268,6 +281,7 @@ const fnComp = function (knex, tablePrefix = '') {
         return result;
     }
 
+    // Creates a component record and optionally its relations
     this.create = async function create(comp, upstreamRelSources = [], downstreamRelTargets = []) {
         is.valid(is.objectWithProps(compProps), is.maybeArray, is.maybeArray, arguments);
         return await knex.transaction(
@@ -281,9 +295,11 @@ const fnComp = function (knex, tablePrefix = '') {
         );
     };
 
+    // Returns one or more component records and some or all related records
     this.get = async function get(comp, filters = {}) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
         const compCalls = {};
+        // Saves all related component record database calls in a buffer (compCalls)
         function saveCalls(comp) {
             is.valid(is.objectWithProps(compProps), arguments);
             if (!compCalls[comp.name]) {
@@ -292,6 +308,7 @@ const fnComp = function (knex, tablePrefix = '') {
                 compCalls[comp.name].push(comp.data().id);
             }
         }
+        // Retrieves all related component records in one pass using the call buffer (compCalls)
         async function getRelatedCompRecords() {
             return await Promise.all(
                 _.map((k) =>
@@ -299,6 +316,7 @@ const fnComp = function (knex, tablePrefix = '') {
                 )(_.keys(compCalls))
             );
         }
+        // Removes the duplicate records created as a side effect of upstream/downstream record processing
         function removeDuplicates(result, compName) {
             is.valid(is.maybeObject, is.string, arguments);
             return { [compName]: _.slice(0, _.get('length')(_.get(compName, result)) / 2)(_.get(compName, result)) };
@@ -321,6 +339,7 @@ const fnComp = function (knex, tablePrefix = '') {
         );
     };
 
+    // Initializes the library by registering passed components and creating the necessary database schemas if necessary
     this.init = async function init(compCollection = []) {
         is.valid(is.maybeArray, arguments);
         compCollection.push(rel);
