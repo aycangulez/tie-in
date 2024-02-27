@@ -1,4 +1,3 @@
-const _ = require('lodash/fp');
 const { is } = require('../helper');
 
 function rel(compName = 'rel') {
@@ -36,11 +35,11 @@ function rel(compName = 'rel') {
         );
         const compObject = Object.create(compSchema);
         compObject.data = () => ({
-            id: _.get('id')(input),
-            source_comp: _.get('sourceComp')(input),
-            source_id: _.get('sourceId')(input),
-            target_comp: _.get('targetComp')(input),
-            target_id: _.get('targetId')(input),
+            id: input?.id,
+            source_comp: input?.sourceComp,
+            source_id: input?.sourceId,
+            target_comp: input?.targetComp,
+            target_id: input?.targetId,
             created_at: undefined,
             updated_at: undefined,
         });

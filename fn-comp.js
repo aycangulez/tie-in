@@ -186,7 +186,7 @@ const fnComp = function (knex, tablePrefix = '') {
                   )
                 : await selectRecordsFunc(comp, knex, filters.orderBy, filters.offset, filters.limit);
         } else {
-            compRecs = [{ id: comp.data().id, _unresolved: comp.name }];
+            compRecs = [{ id: _.get('id')(comp.data()), _unresolved: comp.name }];
             saveCallsFunc(comp);
         }
         if (!result[comp.name]) {
@@ -197,7 +197,7 @@ const fnComp = function (knex, tablePrefix = '') {
             if (level === filters.upstreamLimit) {
                 continue;
             }
-            let relComp = rel({ targetComp: comp.name, targetId: compRecs[i].id });
+            let relComp = rel({ targetComp: comp.name, targetId: _.get('id')(compRecs[i]) });
             let relRecs = await selectRecordsFunc(relComp, knex, ['id'], 0, -1);
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
@@ -241,7 +241,7 @@ const fnComp = function (knex, tablePrefix = '') {
                   )
                 : await selectRecordsFunc(comp, knex, filters.offset, filters.limit);
         } else {
-            compRecs = [{ id: comp.data().id, _unresolved: comp.name }];
+            compRecs = [{ id: _.get('id')(comp.data()), _unresolved: comp.name }];
             saveCallsFunc(comp);
         }
         if (!result[comp.name]) {
@@ -252,7 +252,7 @@ const fnComp = function (knex, tablePrefix = '') {
             if (level === filters.downstreamLimit) {
                 continue;
             }
-            let relComp = rel({ sourceComp: comp.name, sourceId: compRecs[i].id });
+            let relComp = rel({ sourceComp: comp.name, sourceId: _.get('id')(compRecs[i]) });
             let relRecs = await selectRecordsFunc(relComp, knex, ['id'], 0, -1);
 
             for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
@@ -313,9 +313,9 @@ const fnComp = function (knex, tablePrefix = '') {
         function saveCalls(comp) {
             is.valid(is.objectWithProps(compProps), arguments);
             if (!compCalls[comp.name]) {
-                compCalls[comp.name] = [comp.data().id];
+                compCalls[comp.name] = [_.get('id')(comp.data())];
             } else {
-                compCalls[comp.name].push(comp.data().id);
+                compCalls[comp.name].push(_.get('id')(comp.data()));
             }
         }
         // Retrieves all related component records in one pass using the call buffer (compCalls)

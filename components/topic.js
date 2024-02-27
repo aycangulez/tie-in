@@ -1,4 +1,3 @@
-const _ = require('lodash/fp');
 const { is } = require('../helper');
 
 function topic(compName = 'topic') {
@@ -23,8 +22,8 @@ function topic(compName = 'topic') {
         is.valid(is.objectWithProps({ id: is.maybeNumber, title: is.maybeString }), arguments);
         const compObject = Object.create(compSchema);
         compObject.data = () => ({
-            id: _.get('id')(input),
-            title: _.get('title')(input),
+            id: input?.id,
+            title: input?.title,
             created_at: undefined,
             updated_at: undefined,
         });

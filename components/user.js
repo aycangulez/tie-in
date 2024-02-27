@@ -1,4 +1,3 @@
-const _ = require('lodash/fp');
 const { is } = require('../helper');
 
 function user(compName = 'user') {
@@ -27,9 +26,9 @@ function user(compName = 'user') {
         );
         const compObject = Object.create(compSchema);
         compObject.data = () => ({
-            id: _.get('id')(input),
-            username: _.get('username')(input),
-            email: _.get('email')(input),
+            id: input?.id,
+            username: input?.username,
+            email: input?.email,
             created_at: undefined,
             updated_at: undefined,
         });
