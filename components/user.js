@@ -1,3 +1,4 @@
+const _ = require('lodash/fp');
 const { is } = require('../helper');
 
 function user(compName = 'user') {
@@ -19,13 +20,16 @@ function user(compName = 'user') {
         },
     };
 
-    return function (id, username, email) {
-        is.valid(is.maybeNumber, is.maybeString, is.maybeString, arguments);
+    return function (input) {
+        is.valid(
+            is.objectWithProps({ id: is.maybeNumber, username: is.maybeString, email: is.maybeString }),
+            arguments
+        );
         const compObject = Object.create(compSchema);
         compObject.data = () => ({
-            id,
-            username,
-            email,
+            id: _.get('id')(input),
+            username: _.get('username')(input),
+            email: _.get('email')(input),
             created_at: undefined,
             updated_at: undefined,
         });

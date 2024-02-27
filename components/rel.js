@@ -1,3 +1,4 @@
+const _ = require('lodash/fp');
 const { is } = require('../helper');
 
 function rel(compName = 'rel') {
@@ -22,15 +23,24 @@ function rel(compName = 'rel') {
         },
     };
 
-    return function (id, sourceComp, sourceId, targetComp, targetId) {
-        is.valid(is.maybeNumber, is.maybeString, is.maybeNumber, is.maybeString, is.maybeNumber, arguments);
+    return function (input) {
+        is.valid(
+            is.objectWithProps({
+                id: is.maybeNumber,
+                sourceComp: is.maybeString,
+                sourceId: is.maybeNumber,
+                targetComp: is.maybeString,
+                targetId: is.maybeNumber,
+            }),
+            arguments
+        );
         const compObject = Object.create(compSchema);
         compObject.data = () => ({
-            id,
-            source_comp: sourceComp,
-            source_id: sourceId,
-            target_comp: targetComp,
-            target_id: targetId,
+            id: _.get('id')(input),
+            source_comp: _.get('sourceComp')(input),
+            source_id: _.get('sourceId')(input),
+            target_comp: _.get('targetComp')(input),
+            target_id: _.get('targetId')(input),
             created_at: undefined,
             updated_at: undefined,
         });

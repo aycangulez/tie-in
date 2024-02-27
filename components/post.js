@@ -1,3 +1,4 @@
+const _ = require('lodash/fp');
 const { is } = require('../helper');
 
 function post(compName = 'post') {
@@ -17,12 +18,12 @@ function post(compName = 'post') {
         },
     };
 
-    return function (id, content) {
-        is.valid(is.maybeNumber, is.maybeString, arguments);
+    return function (input) {
+        is.valid(is.objectWithProps({ id: is.maybeNumber, content: is.maybeString }), arguments);
         const compObject = Object.create(compSchema);
         compObject.data = () => ({
-            id,
-            content,
+            id: _.get('id')(input),
+            content: _.get('content')(input),
             created_at: undefined,
             updated_at: undefined,
         });
