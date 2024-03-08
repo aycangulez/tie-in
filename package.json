@@ -17,6 +17,7 @@
     "devDependencies": {
         "chai": "^4.3.10",
         "chai-as-promised": "^7.1.1",
+        "chai-datetime": "^1.8.0",
         "mocha": "^10.2.0",
         "pg": "^8.11.3"
     }

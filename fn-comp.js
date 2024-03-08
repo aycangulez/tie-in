@@ -4,7 +4,8 @@ const { is } = require('./helper');
 const rel = require('./components/rel')();
 const memoizeWithResolver = _.memoize.convert({ fixed: false });
 
-const fnComp = function (knex, tablePrefix = '') {
+const fnComp = function (knexConfig, tablePrefix = '') {
+    const knex = require('knex')(knexConfig);
     is.valid(is.object, is.maybeString, arguments);
     var comps = {};
     const compProps = { name: is.string, data: is.func, schema: is.func };
@@ -15,11 +16,19 @@ const fnComp = function (knex, tablePrefix = '') {
         return _.pickBy((v) => !_.isUndefined(v))(compData);
     }
 
-    // Aliases column names in camelCase
-    function getColumnNames(compData) {
+    // Returns aliased column names in camelCase for use in select operations
+    function getColumnNamesForSelect(compData) {
         is.valid(is.object, arguments);
         let colNames = {};
         _.each((k) => (colNames[_.camelCase(k)] = k))(_.keys(compData));
+        return colNames;
+    }
+
+    // Converts column names to snake case for use in inserts/updates
+    function getColumnNamesForUpdate(compData) {
+        is.valid(is.object, arguments);
+        let colNames = {};
+        _.each((k) => (colNames[_.snakeCase(k)] = compData[k]))(_.keys(compData));
         return colNames;
     }
 
@@ -27,7 +36,7 @@ const fnComp = function (knex, tablePrefix = '') {
     async function insertRecord(comp, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
         return trx(tablePrefix + comp.name)
-            .insert(compact(comp.data()))
+            .insert(getColumnNamesForUpdate(compact(comp.data())))
             .returning('id')
             .then(_.flow(_.head, _.get('id')));
     }
@@ -44,7 +53,7 @@ const fnComp = function (knex, tablePrefix = '') {
         );
         return trx(tablePrefix + comp.name)
             .select()
-            .columns(getColumnNames(comp.data()))
+            .columns(getColumnNamesForSelect(comp.data()))
             .where(compact(comp.data()))
             .orderBy(...orderBy)
             .offset(offset)
@@ -64,7 +73,7 @@ const fnComp = function (knex, tablePrefix = '') {
         );
         return trx(tablePrefix + comp.name)
             .select()
-            .columns(getColumnNames(comp.data()))
+            .columns(getColumnNamesForSelect(comp.data()))
             .whereExists(function () {
                 if (filterComps.length > 1) {
                     this.intersect(
@@ -104,7 +113,7 @@ const fnComp = function (knex, tablePrefix = '') {
         is.valid(is.objectWithProps(compProps), is.array, is.maybeObject, arguments);
         return trx(tablePrefix + comp.name)
             .select()
-            .columns(getColumnNames(comp.data()))
+            .columns(getColumnNamesForSelect(comp.data()))
             .whereIn('id', ids);
     }
 
@@ -305,6 +314,18 @@ const fnComp = function (knex, tablePrefix = '') {
         );
     };
 
+    // Updates a component record, optionally accepts a value for the updatedAt field
+    this.update = async function update(comp, now = new Date()) {
+        is.valid(is.objectWithProps(compProps), is.maybeDate, arguments);
+        const fields = compact(comp.data());
+        if (!fields.updatedAt) {
+            fields.updatedAt = now;
+        }
+        return knex(tablePrefix + comp.name)
+            .update(getColumnNamesForUpdate(fields))
+            .where('id', fields.id);
+    };
+
     // Returns one or more component records and some or all related records
     this.get = async function get(comp, filters = {}) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
@@ -357,6 +378,8 @@ const fnComp = function (knex, tablePrefix = '') {
         await Promise.all(componetSchemas);
         _.each((comp) => (comps[comp().name] = comp))(compCollection);
     };
+
+    this.knex = knex;
 
     return this;
 };

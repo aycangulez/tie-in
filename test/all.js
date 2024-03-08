@@ -1,19 +1,20 @@
-const knex = require('knex')({
+const knexConfig = {
     client: 'pg',
     connection: process.env.FN_COMP_PG_CONNECTION_STRING,
     searchPath: ['knex', 'public'],
     debug: false,
-});
+};
 
-const comp = require('../fn-comp')(knex);
+const comp = require('../fn-comp')(knexConfig);
+const knex = comp.knex;
 const user = require('../components/user')();
 const post = require('../components/post')();
 const topic = require('../components/topic')();
 const _ = require('lodash/fp');
 const chai = require('chai');
-const chaiAsPromised = require('chai-as-promised');
+chai.use(require('chai-datetime')).should();
+chai.use(require('chai-as-promised')).should();
 const should = chai.should();
-chai.use(chaiAsPromised).should();
 
 async function clearDB() {
     const promises = [];
@@ -32,11 +33,21 @@ describe('comp', function () {
     });
 
     it('creates and gets user', async function () {
-        await comp.create(user({ username: 'Asuka', email: 'asuka@localhost' }));
+        await comp.create(user({ username: 'Asuka', email: 'asuka@elsewhere' }));
         await comp
             .get(user({ id: 1 }))
             .should.eventually.have.nested.include({ 'user[0].self.username': 'Asuka' })
+            .and.have.nested.include({ 'user[0].self.email': 'asuka@elsewhere' });
+    });
+
+    it('updates user', async function () {
+        const now = new Date();
+        await comp.update(user({ id: 1, email: 'asuka@localhost' }), now);
+        const user1 = await comp.get(user({ id: 1 }));
+        user1.should.have.nested
+            .include({ 'user[0].self.username': 'Asuka' })
             .and.have.nested.include({ 'user[0].self.email': 'asuka@localhost' });
+        user1.user[0].self.updatedAt.should.equalDate(now);
     });
 
     it('creates post and associates with upstream user', async function () {
