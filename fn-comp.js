@@ -274,14 +274,14 @@ const fnComp = function (knexConfig, tablePrefix = '') {
     }
 
     // Creates a component record and optionally its relations
-    this.create = async function create(comp, upstreamRelSources = [], downstreamRelTargets = [], trx) {
-        is.valid(is.objectWithProps(compProps), is.maybeArray, is.maybeArray, is.maybeObject, arguments);
+    this.create = async function create(comp, rels, trx) {
+        is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
         async function steps(trx) {
             return await chain(
-                () => checkRelSources(_.concat(upstreamRelSources, downstreamRelTargets), trx),
+                () => checkRelSources(_.concat(_.get('upstream')(rels) || [], _.get('downstream')(rels) || []), trx),
                 () => insertRecord(comp, trx),
-                (id) => insertUpstreamRels(upstreamRelSources, comp.name, id, trx),
-                (id) => insertDownstreamRels(downstreamRelTargets, comp.name, id, trx)
+                (id) => insertUpstreamRels(_.get('upstream')(rels), comp.name, id, trx),
+                (id) => insertDownstreamRels(_.get('downstream')(rels), comp.name, id, trx)
             );
         }
         return trx ? await steps(trx) : await knex.transaction(steps);

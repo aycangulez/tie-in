@@ -34,7 +34,7 @@ describe('comp', function () {
 
     it('creates user inside an external transaction', async function () {
         await knex.transaction(
-            async (trx) => await comp.create(user({ username: 'Asuka', email: 'asuka@elsewhere' }), [], [], trx)
+            async (trx) => await comp.create(user({ username: 'Asuka', email: 'asuka@elsewhere' }), {}, trx)
         );
         await comp
             .get(user({ id: 1 }))
@@ -53,7 +53,7 @@ describe('comp', function () {
     });
 
     it('creates post and associates with upstream user', async function () {
-        await comp.create(post({ content: 'Post 1' }), [user({ id: 1 })]);
+        await comp.create(post({ content: 'Post 1' }), { upstream: [user({ id: 1 })] });
         await comp
             .get(post({ id: 1 }))
             .should.eventually.have.nested.include({ 'post[0].self.content': 'Post 1' })
@@ -61,7 +61,7 @@ describe('comp', function () {
     });
 
     it('creats topic and associates with upstream user and downstream post', async function () {
-        await comp.create(topic({ title: 'Topic 1' }), [user({ id: 1 })], [post({ id: 1 })]);
+        await comp.create(topic({ title: 'Topic 1' }), { upstream: [user({ id: 1 })], downstream: [post({ id: 1 })] });
         await comp
             .get(topic({ id: 1 }))
             .should.eventually.have.nested.include({ 'topic[0].self.title': 'Topic 1' })
@@ -71,7 +71,7 @@ describe('comp', function () {
 
     it('adds post by new user to topic and gets posts in descending order', async function () {
         await comp.create(user({ username: 'Katniss', email: 'katniss@localhost' }));
-        await comp.create(post({ content: 'Post 2' }), [user({ id: 2 }), topic({ id: 1 })]);
+        await comp.create(post({ content: 'Post 2' }), { upstream: [user({ id: 2 }), topic({ id: 1 })] });
         await comp
             .get(post(), { orderBy: ['createdAt', 'desc'] })
             .should.eventually.have.nested.include({ 'post[0].self.content': 'Post 2' })
@@ -86,7 +86,7 @@ describe('comp', function () {
 
     it('gets posts in topic #1 in descending order while upstream traversel is limited to 1 level', async function () {
         await comp.create(topic({ title: 'Topic 2' }));
-        await comp.create(post({ content: 'Post 3' }), [user({ id: 2 }), topic({ id: 2 })]);
+        await comp.create(post({ content: 'Post 3' }), { upstream: [user({ id: 2 }), topic({ id: 2 })] });
         await comp
             .get(post(), {
                 upstreamLimit: 1,
