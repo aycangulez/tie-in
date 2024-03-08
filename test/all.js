@@ -32,8 +32,10 @@ describe('comp', function () {
         await knex.destroy();
     });
 
-    it('creates and gets user', async function () {
-        await comp.create(user({ username: 'Asuka', email: 'asuka@elsewhere' }));
+    it('creates and gets user inside an external transaction', async function () {
+        await knex.transaction(
+            async (trx) => await comp.create(user({ username: 'Asuka', email: 'asuka@elsewhere' }), [], [], trx)
+        );
         await comp
             .get(user({ id: 1 }))
             .should.eventually.have.nested.include({ 'user[0].self.username': 'Asuka' })

@@ -301,27 +301,27 @@ const fnComp = function (knexConfig, tablePrefix = '') {
     }
 
     // Creates a component record and optionally its relations
-    this.create = async function create(comp, upstreamRelSources = [], downstreamRelTargets = []) {
-        is.valid(is.objectWithProps(compProps), is.maybeArray, is.maybeArray, arguments);
-        return await knex.transaction(
-            async (trx) =>
-                await chain(
-                    () => checkRelSources(_.concat(upstreamRelSources, downstreamRelTargets), trx),
-                    () => insertRecord(comp, trx),
-                    (id) => insertUpstreamRels(upstreamRelSources, comp.name, id, trx),
-                    (id) => insertDownstreamRels(downstreamRelTargets, comp.name, id, trx)
-                )
-        );
+    this.create = async function create(comp, upstreamRelSources = [], downstreamRelTargets = [], trx) {
+        is.valid(is.objectWithProps(compProps), is.maybeArray, is.maybeArray, is.maybeObject, arguments);
+        async function steps(trx) {
+            return await chain(
+                () => checkRelSources(_.concat(upstreamRelSources, downstreamRelTargets), trx),
+                () => insertRecord(comp, trx),
+                (id) => insertUpstreamRels(upstreamRelSources, comp.name, id, trx),
+                (id) => insertDownstreamRels(downstreamRelTargets, comp.name, id, trx)
+            );
+        }
+        return trx ? await steps(trx) : await knex.transaction(steps);
     };
 
     // Updates a component record, optionally accepts a value for the updatedAt field
-    this.update = async function update(comp, now = new Date()) {
-        is.valid(is.objectWithProps(compProps), is.maybeDate, arguments);
+    this.update = async function update(comp, now = new Date(), trx = knex) {
+        is.valid(is.objectWithProps(compProps), is.maybeDate, is.maybeObject, arguments);
         const fields = compact(comp.data());
         if (!fields.updatedAt) {
             fields.updatedAt = now;
         }
-        return knex(tablePrefix + comp.name)
+        return trx(tablePrefix + comp.name)
             .update(getColumnNamesForUpdate(fields))
             .where('id', fields.id);
     };
