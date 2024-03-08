@@ -32,7 +32,7 @@ describe('comp', function () {
         await knex.destroy();
     });
 
-    it('creates and gets user inside an external transaction', async function () {
+    it('creates user inside an external transaction', async function () {
         await knex.transaction(
             async (trx) => await comp.create(user({ username: 'Asuka', email: 'asuka@elsewhere' }), [], [], trx)
         );
@@ -90,7 +90,7 @@ describe('comp', function () {
         await comp
             .get(post(), {
                 upstreamLimit: 1,
-                filterUpstreamBy: { comp: [topic({ id: 1 })], orderBy: ['createdAt', 'desc'] },
+                filterUpstreamBy: { comps: [topic({ id: 1 })], orderBy: ['createdAt', 'desc'] },
             })
             .should.eventually.have.nested.include({ 'post[0].self.content': 'Post 2' })
             .and.have.nested.include({ 'post[0].user[0].self.username': 'Katniss' })
