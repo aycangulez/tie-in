@@ -7,7 +7,7 @@ const memoizeWithResolver = _.memoize.convert({ fixed: false });
 const fnComp = function (knexConfig, tablePrefix = '') {
     const knex = require('knex')(knexConfig);
     is.valid(is.object, is.maybeString, arguments);
-    var comps = {};
+    const comps = {};
     const compProps = { name: is.string, data: is.func, schema: is.func };
 
     // Removes columns with undefined values
@@ -19,7 +19,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
     // Returns aliased column names in camelCase for use in select operations
     function getColumnNamesForSelect(compData) {
         is.valid(is.object, arguments);
-        let colNames = {};
+        const colNames = {};
         _.each((k) => (colNames[_.camelCase(k)] = k))(_.keys(compData));
         return colNames;
     }
@@ -27,7 +27,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
     // Converts column names to snake case for use in inserts/updates
     function getColumnNamesForUpdate(compData) {
         is.valid(is.object, arguments);
-        let colNames = {};
+        const colNames = {};
         _.each((k) => (colNames[_.snakeCase(k)] = compData[k]))(_.keys(compData));
         return colNames;
     }
@@ -116,15 +116,15 @@ const fnComp = function (knexConfig, tablePrefix = '') {
     }
 
     // Inserts given upstream relations for a component record
-    async function insertUpstreamRels(relSources, targetComp, targetId, trx = knex) {
-        is.valid(is.maybeArray, is.maybeString, is.maybeNumber, is.maybeObject, arguments);
+    async function insertUpstreamRels(targetComp, relSources, trx = knex) {
+        is.valid(is.objectWithProps(compProps), is.maybeArray, is.maybeObject, arguments);
         let promises = [];
         _.each((relSource) => {
             let relComp = rel({
                 sourceComp: relSource.name,
-                sourceId: _.get('id')(relSource.data()),
-                targetComp,
-                targetId,
+                sourceId: relSource.data().id,
+                targetComp: targetComp.name,
+                targetId: targetComp.data().id,
             });
             promises.push(() =>
                 selectRecords(relComp, {}, trx).then((result) => (_.head(result) ? false : insertRecord(relComp, trx)))
@@ -133,19 +133,18 @@ const fnComp = function (knexConfig, tablePrefix = '') {
         for (let p in promises) {
             await promises[p]();
         }
-        return targetId;
     }
 
     // Inserts given downstream relations for a component record
-    async function insertDownstreamRels(relTargets, sourceComp, sourceId, trx = knex) {
-        is.valid(is.maybeArray, is.maybeString, is.maybeNumber, is.maybeObject, arguments);
+    async function insertDownstreamRels(sourceComp, relTargets, trx = knex) {
+        is.valid(is.objectWithProps(compProps), is.maybeArray, is.maybeObject, arguments);
         let promises = [];
         _.each((relTarget) => {
             let relComp = rel({
-                sourceComp,
-                sourceId,
+                sourceComp: sourceComp.name,
+                sourceId: sourceComp.data().id,
                 targetComp: relTarget.name,
-                targetId: _.get('id')(relTarget.data()),
+                targetId: relTarget.data().id,
             });
             promises.push(() =>
                 selectRecords(relComp, {}, trx).then((result) => (_.head(result) ? false : insertRecord(relComp, trx)))
@@ -155,7 +154,6 @@ const fnComp = function (knexConfig, tablePrefix = '') {
             // Need to do inserts one by one in a transaction
             await promises[p]();
         }
-        return sourceId;
     }
 
     // Returns related upstream records for given component record(s), but doesn't immediately retrieve related record details
@@ -273,6 +271,17 @@ const fnComp = function (knexConfig, tablePrefix = '') {
         return result;
     }
 
+    this.createRels = async function createRels(comp, rels, trx) {
+        is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
+        async function steps(trx) {
+            return await chain(
+                () => insertUpstreamRels(comp, _.get('upstream')(rels), trx),
+                () => insertDownstreamRels(comp, _.get('downstream')(rels), trx)
+            );
+        }
+        return trx ? await steps(trx) : await knex.transaction(steps);
+    };
+
     // Creates a component record and optionally its relations
     this.create = async function create(comp, rels, trx) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
@@ -280,8 +289,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
             return await chain(
                 () => checkRelSources(_.concat(_.get('upstream')(rels) || [], _.get('downstream')(rels) || []), trx),
                 () => insertRecord(comp, trx),
-                (id) => insertUpstreamRels(_.get('upstream')(rels), comp.name, id, trx),
-                (id) => insertDownstreamRels(_.get('downstream')(rels), comp.name, id, trx)
+                (id) => this.createRels(comps[comp.name]({ id }), rels, trx)
             );
         }
         return trx ? await steps(trx) : await knex.transaction(steps);
