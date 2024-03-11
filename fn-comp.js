@@ -41,6 +41,14 @@ const fnComp = function (knexConfig, tablePrefix = '') {
             .then(_.flow(_.head, _.get('id')));
     }
 
+    // Deletes component records
+    async function deleteRecords(comp, trx = knex) {
+        is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
+        return trx(tablePrefix + comp.name)
+            .where(getColumnNamesForUpdate(compact(comp.data())))
+            .del();
+    }
+
     // Selects component records
     async function selectRecords(comp, filters, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
@@ -104,55 +112,47 @@ const fnComp = function (knexConfig, tablePrefix = '') {
             .whereIn('id', ids);
     }
 
-    // Checks if all given relations exist in the database
-    async function checkRelSources(relSources, trx = knex) {
-        is.valid(is.maybeArray, is.maybeObject, arguments);
-        const sourcePromises = _.map((v) => selectRecords(v, {}, trx))(relSources);
-        const sourceRecs = await Promise.all(sourcePromises);
-        const numSourcesReturned = _.flow(_.compact, _.get('length'))(sourceRecs);
-        if (numSourcesReturned < _.get('length')(relSources)) {
-            throw new Error('Missing relation sources.');
+    // Inserts upstream relations for given component records, ignores existing relations
+    async function insertUpstreamRels(targetComp, relSources = [], trx = knex) {
+        is.valid(is.objectWithProps(compProps), is.maybeArray, is.maybeObject, arguments);
+        const targetCompRecs = await selectRecords(targetComp, { limit: -1 }, trx);
+        for (const targetCompRec of targetCompRecs) {
+            for (const relSource of relSources) {
+                let relSourceRecs = await selectRecords(relSource, { limit: -1 }, trx);
+                for (const relSourceRec of relSourceRecs) {
+                    let relComp = rel({
+                        sourceComp: relSource.name,
+                        sourceId: relSourceRec.id,
+                        targetComp: targetComp.name,
+                        targetId: targetCompRec.id,
+                    });
+                    await selectRecords(relComp, {}, trx).then((result) =>
+                        _.head(result) ? false : insertRecord(relComp, trx)
+                    );
+                }
+            }
         }
     }
 
-    // Inserts given upstream relations for a component record
-    async function insertUpstreamRels(targetComp, relSources, trx = knex) {
+    // Inserts downstream relations for given component records, ignores existing relations
+    async function insertDownstreamRels(sourceComp, relTargets = [], trx = knex) {
         is.valid(is.objectWithProps(compProps), is.maybeArray, is.maybeObject, arguments);
-        let promises = [];
-        _.each((relSource) => {
-            let relComp = rel({
-                sourceComp: relSource.name,
-                sourceId: relSource.data().id,
-                targetComp: targetComp.name,
-                targetId: targetComp.data().id,
-            });
-            promises.push(() =>
-                selectRecords(relComp, {}, trx).then((result) => (_.head(result) ? false : insertRecord(relComp, trx)))
-            );
-        })(relSources);
-        for (let p in promises) {
-            await promises[p]();
-        }
-    }
-
-    // Inserts given downstream relations for a component record
-    async function insertDownstreamRels(sourceComp, relTargets, trx = knex) {
-        is.valid(is.objectWithProps(compProps), is.maybeArray, is.maybeObject, arguments);
-        let promises = [];
-        _.each((relTarget) => {
-            let relComp = rel({
-                sourceComp: sourceComp.name,
-                sourceId: sourceComp.data().id,
-                targetComp: relTarget.name,
-                targetId: relTarget.data().id,
-            });
-            promises.push(() =>
-                selectRecords(relComp, {}, trx).then((result) => (_.head(result) ? false : insertRecord(relComp, trx)))
-            );
-        })(relTargets);
-        for (let p in promises) {
-            // Need to do inserts one by one in a transaction
-            await promises[p]();
+        const sourceCompRecs = await selectRecords(sourceComp, { limit: -1 }, trx);
+        for (const sourceCompRec of sourceCompRecs) {
+            for (const relTarget of relTargets) {
+                let relTargetRecs = await selectRecords(relTarget, { limit: -1 }, trx);
+                for (const relTargetRec of relTargetRecs) {
+                    let relComp = rel({
+                        sourceComp: sourceComp.name,
+                        sourceId: sourceCompRec.id,
+                        targetComp: relTarget.name,
+                        targetId: relTargetRec.id,
+                    });
+                    await selectRecords(relComp, {}, trx).then((result) =>
+                        _.head(result) ? false : insertRecord(relComp, trx)
+                    );
+                }
+            }
         }
     }
 
@@ -271,6 +271,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
         return result;
     }
 
+    // Creates the relations for given component records
     this.createRels = async function createRels(comp, rels, trx) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
         async function steps(trx) {
@@ -287,7 +288,6 @@ const fnComp = function (knexConfig, tablePrefix = '') {
         is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
         async function steps(trx) {
             return await chain(
-                () => checkRelSources(_.concat(_.get('upstream')(rels) || [], _.get('downstream')(rels) || []), trx),
                 () => insertRecord(comp, trx),
                 (id) => this.createRels(comps[comp.name]({ id }), rels, trx)
             );
@@ -361,6 +361,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
     };
 
     this.knex = knex;
+    this.is = is;
 
     return this;
 };
