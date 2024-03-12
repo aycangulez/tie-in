@@ -100,4 +100,15 @@ describe('comp', function () {
             .and.have.nested.include({ 'post[1].topic[0].self.title': 'Topic 1' })
             .and.does.not.have.nested.include({ 'post[0].topic[0].user[0].self.username': 'Asuka' });
     });
+
+    it('Deletes a post and its relations', async function () {
+        const postId = _.get('post[0].self.id')(await comp.get(post({ content: 'Post 3' }), { upstreamLimit: 0 }));
+        const postRels = await comp.getRels(post({ id: postId }));
+        postRels.upstream.should.have.lengthOf(2);
+        await comp.del(post({ id: postId }));
+        const postAfterDelete = await comp.get(post({ id: postId }));
+        const postRelsAfterDelete = await comp.getRels(post({ id: postId }));
+        postAfterDelete.post.should.have.lengthOf(0);
+        postRelsAfterDelete.upstream.should.have.lengthOf(0);
+    });
 });

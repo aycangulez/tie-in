@@ -283,6 +283,29 @@ const fnComp = function (knexConfig, tablePrefix = '') {
         return trx ? await steps(trx) : await knex.transaction(steps);
     };
 
+    // Gets the relations for given component records
+    this.getRels = async function getRels(comp, trx) {
+        is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
+        async function steps(trx) {
+            const rels = { upstream: [], downstream: [] };
+            return await chain(
+                () => selectRecords(comp, {}, trx),
+                async (recs) => {
+                    for (const rec of recs) {
+                        rels.upstream.push(
+                            ...(await selectRecords(rel({ targetComp: comp.name, targetId: rec.id }), {}, trx))
+                        );
+                        rels.downstream.push(
+                            ...(await selectRecords(rel({ sourceComp: comp.name, sourceId: rec.id }), {}, trx))
+                        );
+                    }
+                    return rels;
+                }
+            );
+        }
+        return trx ? await steps(trx) : await knex.transaction(steps);
+    };
+
     // Creates a component record and optionally its relations
     this.create = async function create(comp, rels, trx) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
@@ -305,6 +328,24 @@ const fnComp = function (knexConfig, tablePrefix = '') {
         return trx(tablePrefix + comp.name)
             .update(getColumnNamesForUpdate(fields))
             .where('id', fields.id);
+    };
+
+    // Deletes component records and their relations
+    this.del = async function del(comp, trx) {
+        is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
+        async function steps(trx) {
+            return await chain(
+                () => selectRecords(comp, {}, trx),
+                async (recs) => {
+                    for (const rec of recs) {
+                        await deleteRecords(rel({ targetComp: comp.name, targetId: rec.id }), trx);
+                        await deleteRecords(rel({ sourceComp: comp.name, sourceId: rec.id }), trx);
+                    }
+                },
+                () => deleteRecords(comp, trx)
+            );
+        }
+        return trx ? await steps(trx) : await knex.transaction(steps);
     };
 
     // Returns one or more component records and some or all related records
@@ -334,8 +375,8 @@ const fnComp = function (knexConfig, tablePrefix = '') {
             return { [compName]: _.slice(0, _.get('length')(_.get(compName, result)) / 2)(_.get(compName, result)) };
         }
 
-        filters.upstreamLimit = filters.upstreamLimit || 10;
-        filters.downstreamLimit = filters.downstreamLimit || 10;
+        filters.upstreamLimit = _.isUndefined(filters.upstreamLimit) ? 10 : filters.upstreamLimit;
+        filters.downstreamLimit = _.isUndefined(filters.downstreamLimit) ? 10 : filters.downstreamLimit;
         const resolverFunc = (comp, ...args) => JSON.stringify([comp.name, comp.data(), args]);
         const selectRecordsFunc = memoizeWithResolver(selectRecords, resolverFunc);
         const selectRecordsByFilterFunc = memoizeWithResolver(selectRecordsByFilter, resolverFunc);
