@@ -111,4 +111,10 @@ describe('comp', function () {
         postAfterDelete.post.should.have.lengthOf(0);
         postRelsAfterDelete.upstream.should.have.lengthOf(0);
     });
+
+    it('Counts posts', async function () {
+        await comp
+            .get(post(), { aggregate: [{ fn: 'count', args: '*' }] })
+            .should.eventually.have.nested.include({ 'post[0].self.count': '2' });
+    });
 });

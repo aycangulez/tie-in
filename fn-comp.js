@@ -49,23 +49,44 @@ const fnComp = function (knexConfig, tablePrefix = '') {
             .del();
     }
 
+    // Modifies a query according to filter options
+    function queryFilterModifier(query, filters) {
+        query
+            .orderBy(...(_.flow(_.get('orderBy'), _.isArray)(filters) ? filters.orderBy : ['id']))
+            .offset(_.get('offset')(filters) || 0);
+        const aggregateFuncs = _.get('aggregate')(filters);
+        if (aggregateFuncs) {
+            query.clear('select');
+            query.clear('order');
+        }
+        _.each((v) => {
+            const fn = _.get('fn')(v);
+            const availableFns = ['avg', 'avgDistinct', 'count', 'countDistinct', 'min', 'max', 'sum', 'sumDistinct'];
+            if (_.indexOf(fn)(availableFns) !== -1) {
+                const argVal = _.flow(_.get('args'), _.trim)(v);
+                query[fn]({ [fn]: argVal === '*' ? '*' : _.snakeCase(argVal) });
+            }
+        })(aggregateFuncs);
+        const limit = _.get('limit')(filters) || 10;
+        if (limit !== -1) {
+            query.limit(limit);
+        }
+        return query;
+    }
+
     // Selects component records
     async function selectRecords(comp, filters, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
-        const limit = _.get('limit')(filters) || 10;
         return trx(tablePrefix + comp.name)
             .select()
             .columns(getColumnNamesForSelect(comp.data()))
             .where(compact(comp.data()))
-            .orderBy(...(_.flow(_.get('orderBy'), _.isArray)(filters) ? filters.orderBy : ['id']))
-            .offset(_.get('offset')(filters) || 0)
-            .limit(limit === -1 ? 1000000000 : limit);
+            .modify(queryFilterModifier, filters);
     }
 
     // Selects component records filtered by associated component records (effectively an inner join)
     async function selectRecordsByFilter(comp, filters, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.object, is.maybeObject, arguments);
-        const limit = _.get('limit')(filters) || 10;
         return trx(tablePrefix + comp.name)
             .select()
             .columns(getColumnNamesForSelect(comp.data()))
@@ -98,9 +119,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
                         .andWhereRaw('rel.target_id = ' + comp.name + '.id');
                 }
             })
-            .orderBy(...(_.flow(_.get('orderBy'), _.isArray)(filters) ? filters.orderBy : ['id']))
-            .offset(_.get('offset')(filters) || 0)
-            .limit(limit === -1 ? 1000000000 : limit);
+            .modify(queryFilterModifier, filters);
     }
 
     // Selects multiple records using a list of ids
@@ -363,7 +382,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
         }
         // Retrieves all related component records in one pass using the call buffer (compCalls)
         async function getRelatedCompRecords() {
-            return await Promise.all(
+            return Promise.all(
                 _.map((k) =>
                     selectRecordsById(comps[k](), _.uniq(compCalls[k])).then((result) => ({ name: k, result }))
                 )(_.keys(compCalls))
@@ -377,6 +396,10 @@ const fnComp = function (knexConfig, tablePrefix = '') {
 
         filters.upstreamLimit = _.isUndefined(filters.upstreamLimit) ? 10 : filters.upstreamLimit;
         filters.downstreamLimit = _.isUndefined(filters.downstreamLimit) ? 10 : filters.downstreamLimit;
+        if (filters.aggregate) {
+            filters.upstreamLimit = 0;
+            filters.downstreamLimit = 0;
+        }
         const resolverFunc = (comp, ...args) => JSON.stringify([comp.name, comp.data(), args]);
         const selectRecordsFunc = memoizeWithResolver(selectRecords, resolverFunc);
         const selectRecordsByFilterFunc = memoizeWithResolver(selectRecordsByFilter, resolverFunc);
@@ -385,10 +408,8 @@ const fnComp = function (knexConfig, tablePrefix = '') {
             (result) =>
                 getDownstreamRecords(comp, result, 0, filters, selectRecordsFunc, selectRecordsByFilterFunc, saveCalls),
             (result) => removeDuplicates(result, comp.name),
-            async (result) => {
-                relCompRecords = await getRelatedCompRecords();
-                return resolveRelatedCompRecords(result, relCompRecords);
-            }
+            (result) =>
+                getRelatedCompRecords().then((relCompRecords) => resolveRelatedCompRecords(result, relCompRecords))
         );
     };
 
