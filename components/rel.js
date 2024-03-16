@@ -16,7 +16,7 @@ function rel(compName = 'rel') {
                     table.integer('target_id').notNullable();
                     table.string('type');
                     table.timestamps(false, true);
-                    table.unique(['source_comp', 'source_id', 'target_comp', 'target_id']);
+                    table.unique(['source_comp', 'source_id', 'target_comp', 'target_id', 'type']);
                     table.index(['target_comp', 'target_id']);
                 });
             }

@@ -321,7 +321,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
     }
 
     // Creates the relations for given component records
-    this.createRels = async function createRels(comp, rels, trx) {
+    async function createRels(comp, rels, trx) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
         async function steps(trx) {
             return await chain(
@@ -330,10 +330,10 @@ const fnComp = function (knexConfig, tablePrefix = '') {
             );
         }
         return trx ? await steps(trx) : await knex.transaction(steps);
-    };
+    }
 
     // Gets the relations for given component records
-    this.getRels = async function getRels(comp, trx) {
+    async function getRels(comp, trx) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
         async function steps(trx) {
             const rels = { upstream: [], downstream: [] };
@@ -353,30 +353,30 @@ const fnComp = function (knexConfig, tablePrefix = '') {
             );
         }
         return trx ? await steps(trx) : await knex.transaction(steps);
-    };
+    }
 
     // Creates a component record and optionally its relations
-    this.create = async function create(comp, rels, trx) {
+    async function create(comp, rels, trx) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
         async function steps(trx) {
             return await chain(
                 () => insertRecord(comp, trx),
-                (id) => this.createRels(comps[comp.name]({ id }), rels, trx)
+                (id) => createRels(comps[comp.name]({ id }), rels, trx)
             );
         }
         return trx ? await steps(trx) : await knex.transaction(steps);
-    };
+    }
 
     // Updates a single component record by id
-    this.updateById = async function update(comp, trx = knex) {
+    async function updateById(comp, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
         return trx(tablePrefix + comp.name)
             .update(getColumnNamesForUpdate(comp))
             .where('id', comp.data().id);
-    };
+    }
 
     // Deletes component records and their relations
-    this.del = async function del(comp, trx) {
+    async function del(comp, trx) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
         async function steps(trx) {
             return await chain(
@@ -391,10 +391,10 @@ const fnComp = function (knexConfig, tablePrefix = '') {
             );
         }
         return trx ? await steps(trx) : await knex.transaction(steps);
-    };
+    }
 
     // Returns one or more component records and some or all related records
-    this.get = async function get(comp, filters = {}) {
+    async function get(comp, filters = {}) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
         const compCalls = {};
         // Saves all related component record database calls in a buffer (compCalls)
@@ -436,22 +436,29 @@ const fnComp = function (knexConfig, tablePrefix = '') {
             (result) =>
                 getRelatedCompRecords().then((relCompRecords) => resolveRelatedCompRecords(result, relCompRecords))
         );
-    };
+    }
 
     // Initializes the library by registering passed components and creating the necessary database schemas if necessary
-    this.init = async function init(compCollection = []) {
+    async function init(compCollection = []) {
         is.valid(is.maybeArray, arguments);
         compCollection.push(rel);
         const componetSchemas = _.map((comp) => comp().schema(knex, tablePrefix))(compCollection);
         await Promise.all(componetSchemas);
         _.each((comp) => (comps[comp().name] = comp))(compCollection);
+    }
+
+    return {
+        knex,
+        is,
+        rel,
+        createRels,
+        getRels,
+        create,
+        updateById,
+        del,
+        get,
+        init,
     };
-
-    this.knex = knex;
-    this.is = is;
-    this.rel = rel;
-
-    return this;
 };
 
 module.exports = fnComp;
