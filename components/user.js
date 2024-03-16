@@ -21,7 +21,14 @@ function user(compName = 'user') {
 
     return function (input) {
         is.valid(
-            is.objectWithProps({ id: is.maybeNumber, username: is.maybeString, email: is.maybeString }),
+            is.objectWithProps({
+                id: is.maybeNumber,
+                username: is.maybeString,
+                email: is.maybeString,
+                createdAt: is.maybeDate,
+                updatedAt: is.maybeDate,
+                relType: is.maybeString,
+            }),
             arguments
         );
         const compObject = Object.create(compSchema);
@@ -29,8 +36,9 @@ function user(compName = 'user') {
             id: input?.id,
             username: input?.username,
             email: input?.email,
-            created_at: undefined,
-            updated_at: undefined,
+            created_at: input?.createdAt,
+            updated_at: input?.updatedAt,
+            relType: input?.relType,
         });
         return compObject;
     };

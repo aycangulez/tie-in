@@ -44,7 +44,7 @@ describe('comp', function () {
 
     it('updates user', async function () {
         const now = new Date();
-        await comp.update(user({ id: 1, email: 'asuka@localhost' }), now);
+        await comp.updateById(user({ id: 1, email: 'asuka@localhost', updatedAt: now }));
         const user1 = await comp.get(user({ id: 1 }));
         user1.should.have.nested
             .include({ 'user[0].self.username': 'Asuka' })
@@ -53,25 +53,33 @@ describe('comp', function () {
     });
 
     it('creates post and associates with upstream user', async function () {
-        await comp.create(post({ content: 'Post 1' }), { upstream: [user({ id: 1 })] });
+        await comp.create(post({ content: 'Post 1' }), { upstream: [user({ id: 1, relType: 'author' })] });
         await comp
             .get(post({ id: 1 }))
             .should.eventually.have.nested.include({ 'post[0].self.content': 'Post 1' })
+            .and.have.nested.include({ 'post[0].user[0].self.relType': 'author' })
             .and.have.nested.include({ 'post[0].user[0].self.username': 'Asuka' });
     });
 
-    it('creats topic and associates with upstream user and downstream post', async function () {
-        await comp.create(topic({ title: 'Topic 1' }), { upstream: [user({ id: 1 })], downstream: [post({ id: 1 })] });
+    it('creates topic and associates with upstream user and downstream post', async function () {
+        await comp.create(topic({ title: 'Topic 1' }), {
+            upstream: [user({ id: 1, relType: 'starter' })],
+            downstream: [post({ id: 1, relType: 'parent' })],
+        });
         await comp
             .get(topic({ id: 1 }))
             .should.eventually.have.nested.include({ 'topic[0].self.title': 'Topic 1' })
+            .and.have.nested.include({ 'topic[0].user[0].self.relType': 'starter' })
             .and.have.nested.include({ 'topic[0].user[0].self.username': 'Asuka' })
+            .and.have.nested.include({ 'topic[0].post[0].self.relType': 'parent' })
             .and.have.nested.include({ 'topic[0].post[0].self.content': 'Post 1' });
     });
 
     it('adds post by new user to topic and gets posts in descending order', async function () {
         await comp.create(user({ username: 'Katniss', email: 'katniss@localhost' }));
-        await comp.create(post({ content: 'Post 2' }), { upstream: [user({ id: 2 }), topic({ id: 1 })] });
+        await comp.create(post({ content: 'Post 2' }), {
+            upstream: [user({ id: 2, relType: 'author' }), topic({ id: 1, relType: 'parent' })],
+        });
         await comp
             .get(post(), { orderBy: ['createdAt', 'desc'] })
             .should.eventually.have.nested.include({ 'post[0].self.content': 'Post 2' })

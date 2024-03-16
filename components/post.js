@@ -18,13 +18,23 @@ function post(compName = 'post') {
     };
 
     return function (input) {
-        is.valid(is.objectWithProps({ id: is.maybeNumber, content: is.maybeString }), arguments);
+        is.valid(
+            is.objectWithProps({
+                id: is.maybeNumber,
+                content: is.maybeString,
+                createdAt: is.maybeDate,
+                updatedAt: is.maybeDate,
+                relType: is.maybeString,
+            }),
+            arguments
+        );
         const compObject = Object.create(compSchema);
         compObject.data = () => ({
             id: input?.id,
             content: input?.content,
-            created_at: undefined,
-            updated_at: undefined,
+            created_at: input?.createdAt,
+            updated_at: input?.updatedAt,
+            relType: input?.relType,
         });
         return compObject;
     };

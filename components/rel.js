@@ -14,6 +14,7 @@ function rel(compName = 'rel') {
                     table.integer('source_id').notNullable();
                     table.string('target_comp').notNullable();
                     table.integer('target_id').notNullable();
+                    table.string('type');
                     table.timestamps(false, true);
                     table.unique(['source_comp', 'source_id', 'target_comp', 'target_id']);
                     table.index(['target_comp', 'target_id']);
@@ -30,6 +31,9 @@ function rel(compName = 'rel') {
                 sourceId: is.maybeNumber,
                 targetComp: is.maybeString,
                 targetId: is.maybeNumber,
+                type: is.maybeString,
+                createdAt: is.maybeDate,
+                updatedAt: is.maybeDate,
             }),
             arguments
         );
@@ -40,8 +44,9 @@ function rel(compName = 'rel') {
             source_id: input?.sourceId,
             target_comp: input?.targetComp,
             target_id: input?.targetId,
-            created_at: undefined,
-            updated_at: undefined,
+            type: input?.type,
+            created_at: input?.createdAt,
+            updated_at: input?.updatedAt,
         });
         return compObject;
     };
