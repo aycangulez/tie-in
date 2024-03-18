@@ -5,10 +5,21 @@ const rel = require('./components/rel')();
 const memoizeWithResolver = _.memoize.convert({ fixed: false });
 
 const fnComp = function (knexConfig, tablePrefix = '') {
-    const knex = require('knex')(knexConfig);
     is.valid(is.object, is.maybeString, arguments);
+
+    const knex = require('knex')(knexConfig);
     const comps = {};
     const compProps = { name: is.string, data: is.func, schema: is.func };
+    const getFilterProps = {
+        aggregate: is.maybeObject,
+        downstreamLimit: is.maybeNumber,
+        upstreamLimit: is.maybeNumber,
+        filterUpstreamBy: is.maybeObject,
+        where: is.maybeFunc,
+        orderBy: is.maybeArray,
+        offset: is.maybeNumber,
+        limit: is.maybeNumber,
+    };
 
     // Removes columns with undefined values
     function compact(compData) {
@@ -69,6 +80,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
                 query[fn]({ [fn]: argVal === '*' ? '*' : _.snakeCase(argVal) });
             }
         })(aggregateFuncs);
+        query.andWhere(filters.where || (() => {}));
         const limit = _.get('limit')(filters) || 10;
         if (limit !== -1) {
             query.limit(limit);
@@ -78,7 +90,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
 
     // Selects component records
     async function selectRecords(comp, filters, trx = knex) {
-        is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
+        is.valid(is.objectWithProps(compProps), is.objectWithProps(getFilterProps), is.maybeObject, arguments);
         const colNames = compact(comp.data());
         delete colNames.relType;
         return trx(tablePrefix + comp.name)
@@ -89,13 +101,14 @@ const fnComp = function (knexConfig, tablePrefix = '') {
     }
 
     // Selects component records filtered by associated component records (effectively an inner join)
-    async function selectRecordsByFilter(comp, filters, trx = knex) {
-        is.valid(is.objectWithProps(compProps), is.object, is.maybeObject, arguments);
+    async function selectRecordsByRel(comp, filters, trx = knex) {
+        is.valid(is.objectWithProps(compProps), is.objectWithProps(getFilterProps), is.maybeObject, arguments);
+        const filterUpstreamByComps = _.get('filterUpstreamBy.comps')(filters);
         return trx(tablePrefix + comp.name)
             .select()
             .columns(getColumnNamesForSelect(comp))
             .whereExists(function () {
-                if (filters.comps.length > 1) {
+                if (_.get('length')(filterUpstreamByComps) > 1) {
                     this.intersect(
                         (function () {
                             let queries = [];
@@ -109,16 +122,17 @@ const fnComp = function (knexConfig, tablePrefix = '') {
                                         .andWhere('rel.target_comp', comp.name)
                                         .andWhereRaw('rel.target_id = ' + comp.name + '.id')
                                 )
-                            )(filters.comps);
+                            )(filterUpstreamByComps);
                             return queries;
                         })(),
                         true
                     );
                 } else {
+                    const filterComp = _.head(filterUpstreamByComps);
                     this.from(tablePrefix + 'rel')
                         .select('rel.target_id')
-                        .where('rel.source_comp', filters.comps[0].name)
-                        .andWhere('rel.source_id', _.get('id')(filters.comps[0].data()))
+                        .where('rel.source_comp', filterComp.name)
+                        .andWhere('rel.source_id', _.get('id')(filterComp.data()))
                         .andWhere('rel.target_comp', comp.name)
                         .andWhereRaw('rel.target_id = ' + comp.name + '.id');
                 }
@@ -189,7 +203,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
         level,
         filters,
         selectRecordsFunc,
-        selectRecordsByFilterFunc,
+        selectRecordsByRelFunc,
         saveCallsFunc
     ) {
         is.valid(
@@ -197,7 +211,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
             is.object,
             is.maybeString,
             is.number,
-            is.object,
+            is.objectWithProps(getFilterProps),
             is.func,
             is.func,
             is.func,
@@ -206,7 +220,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
         let compRecs;
         if (level === 0) {
             compRecs = filters.filterUpstreamBy
-                ? await selectRecordsByFilterFunc(comp, filters.filterUpstreamBy)
+                ? await selectRecordsByRelFunc(comp, filters)
                 : await selectRecordsFunc(comp, filters);
         } else {
             compRecs = [{ id: _.get('id')(comp.data()), relType, _unresolved: comp.name }];
@@ -233,7 +247,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
                     level + 1,
                     filters,
                     selectRecordsFunc,
-                    selectRecordsByFilterFunc,
+                    selectRecordsByRelFunc,
                     saveCallsFunc
                 );
             }
@@ -249,7 +263,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
         level,
         filters,
         selectRecordsFunc,
-        selectRecordsByFilterFunc,
+        selectRecordsByRelFunc,
         saveCallsFunc
     ) {
         is.valid(
@@ -257,7 +271,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
             is.object,
             is.maybeString,
             is.number,
-            is.object,
+            is.objectWithProps(getFilterProps),
             is.func,
             is.func,
             is.func,
@@ -266,7 +280,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
         let compRecs;
         if (level === 0) {
             compRecs = filters.filterUpstreamBy
-                ? await selectRecordsByFilterFunc(comp, filters.filterUpstreamBy)
+                ? await selectRecordsByRelFunc(comp, filters)
                 : await selectRecordsFunc(comp, filters);
         } else {
             compRecs = [{ id: _.get('id')(comp.data()), relType, _unresolved: comp.name }];
@@ -293,7 +307,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
                     level + 1,
                     filters,
                     selectRecordsFunc,
-                    selectRecordsByFilterFunc,
+                    selectRecordsByRelFunc,
                     saveCallsFunc
                 );
             }
@@ -395,7 +409,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
 
     // Returns one or more component records and some or all related records
     async function get(comp, filters = {}) {
-        is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
+        is.valid(is.objectWithProps(compProps), is.objectWithProps(getFilterProps), arguments);
         const compCalls = {};
         // Saves all related component record database calls in a buffer (compCalls)
         function saveCalls(comp) {
@@ -428,9 +442,9 @@ const fnComp = function (knexConfig, tablePrefix = '') {
         }
         const resolverFunc = (comp, ...args) => JSON.stringify([comp.name, comp.data(), args]);
         const selectRecordsM = memoizeWithResolver(selectRecords, resolverFunc);
-        const selectRecordsByFilterM = memoizeWithResolver(selectRecordsByFilter, resolverFunc);
+        const selectRecordsByRelM = memoizeWithResolver(selectRecordsByRel, resolverFunc);
         return chain(
-            () => getUpstreamRecords(comp, {}, '', 0, filters, selectRecordsM, selectRecordsByFilterM, saveCalls),
+            () => getUpstreamRecords(comp, {}, '', 0, filters, selectRecordsM, selectRecordsByRelM, saveCalls),
             (result) => getDownstreamRecords(comp, result, '', 0, filters, selectRecordsM, selectRecordsM, saveCalls),
             (result) => removeDuplicates(result, comp.name),
             (result) =>

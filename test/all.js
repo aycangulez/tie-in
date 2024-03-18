@@ -98,7 +98,8 @@ describe('comp', function () {
         await comp
             .get(post(), {
                 upstreamLimit: 1,
-                filterUpstreamBy: { comps: [topic({ id: 1 })], orderBy: ['createdAt', 'desc'] },
+                filterUpstreamBy: { comps: [topic({ id: 1 })] },
+                orderBy: ['createdAt', 'desc'],
             })
             .should.eventually.have.nested.include({ 'post[0].self.content': 'Post 2' })
             .and.have.nested.include({ 'post[0].user[0].self.username': 'Katniss' })
@@ -107,6 +108,17 @@ describe('comp', function () {
             .and.have.nested.include({ 'post[1].user[0].self.username': 'Asuka' })
             .and.have.nested.include({ 'post[1].topic[0].self.title': 'Topic 1' })
             .and.does.not.have.nested.include({ 'post[0].topic[0].user[0].self.username': 'Asuka' });
+    });
+    it('gets posts with ids greater than 2 with upstream and downstream set to 0', async function () {
+        await comp
+            .get(post(), {
+                upstreamLimit: 0,
+                downstreamLimit: 0,
+                where: (query) => query.where('id', '>', 2),
+            })
+            .should.eventually.have.nested.include({ 'post[0].self.content': 'Post 3' })
+            .and.does.not.have.nested.include({ 'post[0].user[0].self.username': 'Katniss' })
+            .and.does.not.have.nested.include({ 'post[0].topic[0].self.title': 'Topic 2' });
     });
 
     it('Deletes a post and its relations', async function () {

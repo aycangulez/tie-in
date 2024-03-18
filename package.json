@@ -1,7 +1,7 @@
 {
     "name": "fn-comp",
     "version": "1.0.0",
-    "description": "Lightweight relational component library.",
+    "description": "Relational data component library.",
     "main": "fn-comp.js",
     "scripts": {
         "test": "mocha"
