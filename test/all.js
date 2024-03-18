@@ -98,7 +98,7 @@ describe('comp', function () {
         await comp
             .get(post(), {
                 upstreamLimit: 1,
-                filterUpstreamBy: { comps: [topic({ id: 1 })] },
+                filterUpstreamBy: [topic({ id: 1 })],
                 orderBy: ['createdAt', 'desc'],
             })
             .should.eventually.have.nested.include({ 'post[0].self.content': 'Post 2' })

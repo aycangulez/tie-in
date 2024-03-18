@@ -11,10 +11,10 @@ const fnComp = function (knexConfig, tablePrefix = '') {
     const comps = {};
     const compProps = { name: is.string, data: is.func, schema: is.func };
     const getFilterProps = {
-        aggregate: is.maybeObject,
+        aggregate: is.maybeArray,
         downstreamLimit: is.maybeNumber,
         upstreamLimit: is.maybeNumber,
-        filterUpstreamBy: is.maybeObject,
+        filterUpstreamBy: is.maybeArray,
         where: is.maybeFunc,
         orderBy: is.maybeArray,
         offset: is.maybeNumber,
@@ -103,7 +103,7 @@ const fnComp = function (knexConfig, tablePrefix = '') {
     // Selects component records filtered by associated component records (effectively an inner join)
     async function selectRecordsByRel(comp, filters, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.objectWithProps(getFilterProps), is.maybeObject, arguments);
-        const filterUpstreamByComps = _.get('filterUpstreamBy.comps')(filters);
+        const filterUpstreamByComps = _.get('filterUpstreamBy')(filters);
         return trx(tablePrefix + comp.name)
             .select()
             .columns(getColumnNamesForSelect(comp))
