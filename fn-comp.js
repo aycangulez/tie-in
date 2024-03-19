@@ -1,10 +1,13 @@
 const _ = require('lodash/fp');
 const chain = require('fn-one');
-const { is } = require('./helper');
 const rel = require('./components/rel')();
 const memoizeWithResolver = _.memoize.convert({ fixed: false });
 
-const fnComp = function (knexConfig, tablePrefix = '') {
+const fnComp = function (knexConfig, tablePrefix = '', is) {
+    if (!is) {
+        var is = require('fn-arg-validator');
+        is.config.throw = true;
+    }
     is.valid(is.object, is.maybeString, arguments);
 
     const knex = require('knex')(knexConfig);

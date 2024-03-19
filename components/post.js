@@ -1,8 +1,10 @@
-const { is } = require('../helper');
+const is = require('fn-arg-validator');
 
 function post(compName = 'post') {
     const compSchema = {
-        name: compName,
+        get name() {
+            return compName;
+        },
         async schema(knex, tablePrefix = '') {
             is.valid(is.object, is.maybeString, arguments);
             const tableName = tablePrefix + compName;
