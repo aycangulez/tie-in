@@ -35,7 +35,6 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         is.valid(is.objectWithProps(compProps), arguments);
         const colNames = {};
         _.each((k) => (colNames[_.camelCase(k)] = k))(_.keys(comp.data()));
-        delete colNames.relType;
         return colNames;
     }
 
@@ -44,7 +43,6 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         is.valid(is.objectWithProps(compProps), arguments);
         const colNames = {};
         _.each((k) => (colNames[_.snakeCase(k)] = comp.data()[k]))(_.keys(compact(comp.data())));
-        delete colNames.relType;
         return colNames;
     }
 
@@ -95,7 +93,6 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
     async function selectRecords(comp, filters, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.objectWithProps(getFilterProps), is.maybeObject, arguments);
         const colNames = compact(comp.data());
-        delete colNames.relType;
         return trx(tablePrefix + comp.name)
             .select()
             .columns(getColumnNamesForSelect(comp))
@@ -165,7 +162,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
                         sourceId: relSourceRec.id,
                         targetComp: targetComp.name,
                         targetId: targetCompRec.id,
-                        type: relSource.data().relType,
+                        type: relSource.relType,
                     });
                     await selectRecords(relComp, {}, trx).then((result) =>
                         _.head(result) ? false : insertRecord(relComp, trx)
@@ -188,7 +185,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
                         sourceId: sourceCompRec.id,
                         targetComp: relTarget.name,
                         targetId: relTargetRec.id,
-                        type: relTarget.data().relType,
+                        type: relTarget.relType,
                     });
                     await selectRecords(relComp, {}, trx).then((result) =>
                         _.head(result) ? false : insertRecord(relComp, trx)

@@ -36,10 +36,12 @@ function rel(compName = 'rel') {
                 type: is.maybeString,
                 createdAt: is.maybeDate,
                 updatedAt: is.maybeDate,
+                relType: is.maybeString,
             }),
             arguments
         );
         const compObject = Object.create(compSchema);
+        Object.defineProperty(compObject, 'relType', { value: input?.relType });
         compObject.data = () => ({
             id: input?.id,
             source_comp: input?.sourceComp,

@@ -34,13 +34,13 @@ function user(compName = 'user') {
             arguments
         );
         const compObject = Object.create(compSchema);
+        Object.defineProperty(compObject, 'relType', { value: input?.relType });
         compObject.data = () => ({
             id: input?.id,
             username: input?.username,
             email: input?.email,
             created_at: input?.createdAt,
             updated_at: input?.updatedAt,
-            relType: input?.relType,
         });
         return compObject;
     };

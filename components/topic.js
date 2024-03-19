@@ -32,12 +32,12 @@ function topic(compName = 'topic') {
             arguments
         );
         const compObject = Object.create(compSchema);
+        Object.defineProperty(compObject, 'relType', { value: input?.relType });
         compObject.data = () => ({
             id: input?.id,
             title: input?.title,
             created_at: input?.createdAt,
             updated_at: input?.updatedAt,
-            relType: input?.relType,
         });
         return compObject;
     };
