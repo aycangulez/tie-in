@@ -214,16 +214,19 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         if (!result[comp.name]) {
             result[comp.name] = [];
         }
+        const allRelRecs =
+            level !== filters.upstreamLimit
+                ? _.groupBy('targetId')(
+                      await selectRecordsFunc(rel({ targetComp: comp.name }), {
+                          where: (query) => query.whereIn('target_id', _.map((c) => c.id)(compRecs)),
+                          limit: -1,
+                      })
+                  )
+                : {};
         for (let i = 0, cLen = compRecs.length; i < cLen; i++) {
             result[comp.name].push({ self: compRecs[i] });
-            if (level === filters.upstreamLimit) {
-                continue;
-            }
-            let relComp = rel({ targetComp: comp.name, targetId: _.get('id')(compRecs[i]) });
-            let relRecs = await selectRecordsFunc(relComp, { limit: -1 });
-
-            for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
-                let relRec = relRecs[j];
+            let relRecs = allRelRecs[compRecs[i].id] || [];
+            for (const relRec of relRecs) {
                 let sourceComp = comps[relRec.sourceComp]({ id: relRec.sourceId });
                 result[comp.name][i] = await getUpstreamRecords(
                     sourceComp,
@@ -274,16 +277,19 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         if (!result[comp.name]) {
             result[comp.name] = [];
         }
+        const allRelRecs =
+            level !== filters.upstreamLimit
+                ? _.groupBy('sourceId')(
+                      await selectRecordsFunc(rel({ sourceComp: comp.name }), {
+                          where: (query) => query.whereIn('source_id', _.map((c) => c.id)(compRecs)),
+                          limit: -1,
+                      })
+                  )
+                : {};
         for (let i = 0, cLen = compRecs.length; i < cLen; i++) {
             result[comp.name].push({ self: compRecs[i] });
-            if (level === filters.downstreamLimit) {
-                continue;
-            }
-            let relComp = rel({ sourceComp: comp.name, sourceId: _.get('id')(compRecs[i]) });
-            let relRecs = await selectRecordsFunc(relComp, { limit: -1 });
-
-            for (let j = 0, rLen = relRecs.length; j < rLen; j++) {
-                let relRec = relRecs[j];
+            let relRecs = allRelRecs[compRecs[i].id] || [];
+            for (const relRec of relRecs) {
                 let targetComp = comps[relRec.targetComp]({ id: relRec.targetId });
                 result[comp.name][i] = await getDownstreamRecords(
                     targetComp,
