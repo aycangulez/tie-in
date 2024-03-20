@@ -109,6 +109,18 @@ describe('comp', function () {
             .and.have.nested.include({ 'post[1].topic[0].self.title': 'Topic 1' })
             .and.does.not.have.nested.include({ 'post[0].topic[0].user[0].self.username': 'Asuka' });
     });
+    it('gets posts in topic #1 by user #2 while upstream traversel is limited to 1 level', async function () {
+        await comp
+            .get(post(), {
+                upstreamLimit: 1,
+                filterUpstreamBy: [topic({ id: 1 }), user({ id: 2 })],
+                orderBy: ['createdAt', 'desc'],
+            })
+            .should.eventually.have.nested.include({ 'post[0].self.content': 'Post 2' })
+            .and.have.nested.include({ 'post[0].user[0].self.username': 'Katniss' })
+            .and.have.nested.include({ 'post[0].topic[0].self.title': 'Topic 1' })
+            .and.does.not.have.nested.include({ 'post[1].self.content': 'Post 1' });
+    });
     it('gets posts with ids greater than 2 with upstream and downstream set to 0', async function () {
         await comp
             .get(post(), {

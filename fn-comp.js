@@ -8,11 +8,11 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         var is = require('fn-arg-validator');
         is.config.throw = true;
     }
-    is.valid(is.object, is.maybeString, arguments);
+    is.valid(is.object, is.maybeString, is.maybeObject, arguments);
 
     const knex = require('knex')(knexConfig);
     const comps = {};
-    const compProps = { name: is.string, data: is.func, schema: is.func };
+    const compProps = { name: is.string, relType: is.maybeString, data: is.func, schema: is.func };
     const getFilterProps = {
         aggregate: is.maybeArray,
         downstreamLimit: is.maybeNumber,
@@ -92,51 +92,36 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
     // Selects component records
     async function selectRecords(comp, filters, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.objectWithProps(getFilterProps), is.maybeObject, arguments);
-        const colNames = compact(comp.data());
         return trx(tablePrefix + comp.name)
             .select()
             .columns(getColumnNamesForSelect(comp))
-            .where(colNames)
+            .where(compact(comp.data()))
             .modify(queryFilterModifier, filters);
     }
 
     // Selects component records filtered by associated component records (effectively an inner join)
     async function selectRecordsByRel(comp, filters, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.objectWithProps(getFilterProps), is.maybeObject, arguments);
-        const filterUpstreamByComps = _.get('filterUpstreamBy')(filters);
+        function generateExistsConditon(filterComp) {
+            is.valid(is.objectWithProps(compProps), arguments);
+            return trx
+                .from(tablePrefix + 'rel')
+                .select('rel.target_id')
+                .where('rel.source_comp', filterComp.name)
+                .andWhere('rel.source_id', _.get('id')(filterComp.data()))
+                .andWhere('rel.target_comp', comp.name)
+                .andWhereRaw('rel.target_id = ' + comp.name + '.id');
+        }
+        const relatedComps = _.get('filterUpstreamBy')(filters);
         return trx(tablePrefix + comp.name)
             .select()
             .columns(getColumnNamesForSelect(comp))
-            .whereExists(function () {
-                if (_.get('length')(filterUpstreamByComps) > 1) {
-                    this.intersect(
-                        (function () {
-                            let queries = [];
-                            _.each((filterComp) =>
-                                queries.push(
-                                    trx
-                                        .from(tablePrefix + 'rel')
-                                        .select('rel.target_id')
-                                        .where('rel.source_comp', filterComp.name)
-                                        .andWhere('rel.source_id', _.get('id')(filterComp.data()))
-                                        .andWhere('rel.target_comp', comp.name)
-                                        .andWhereRaw('rel.target_id = ' + comp.name + '.id')
-                                )
-                            )(filterUpstreamByComps);
-                            return queries;
-                        })(),
-                        true
-                    );
-                } else {
-                    const filterComp = _.head(filterUpstreamByComps);
-                    this.from(tablePrefix + 'rel')
-                        .select('rel.target_id')
-                        .where('rel.source_comp', filterComp.name)
-                        .andWhere('rel.source_id', _.get('id')(filterComp.data()))
-                        .andWhere('rel.target_comp', comp.name)
-                        .andWhereRaw('rel.target_id = ' + comp.name + '.id');
-                }
-            })
+            .where(compact(comp.data()))
+            .whereExists(
+                _.get('length')(relatedComps) > 1
+                    ? trx.intersect(_.map(generateExistsConditon)(relatedComps), true)
+                    : generateExistsConditon(_.head(relatedComps))
+            )
             .modify(queryFilterModifier, filters);
     }
 
@@ -445,7 +430,8 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         const selectRecordsByRelM = memoizeWithResolver(selectRecordsByRel, resolverFunc);
         return chain(
             () => getUpstreamRecords(comp, {}, '', 0, filters, selectRecordsM, selectRecordsByRelM, saveCalls),
-            (result) => getDownstreamRecords(comp, result, '', 0, filters, selectRecordsM, selectRecordsM, saveCalls),
+            (result) =>
+                getDownstreamRecords(comp, result, '', 0, filters, selectRecordsM, selectRecordsByRelM, saveCalls),
             (result) => removeDuplicates(result, comp.name),
             (result) =>
                 getRelatedCompRecords().then((relCompRecords) => resolveRelatedCompRecords(result, relCompRecords))
