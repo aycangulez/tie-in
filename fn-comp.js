@@ -125,15 +125,6 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
             .modify(queryFilterModifier, filters);
     }
 
-    // Selects multiple records using a list of ids
-    async function selectRecordsById(comp, ids, trx = knex) {
-        is.valid(is.objectWithProps(compProps), is.array, is.maybeObject, arguments);
-        return trx(tablePrefix + comp.name)
-            .select()
-            .columns(getColumnNamesForSelect(comp))
-            .whereIn('id', ids);
-    }
-
     // Inserts upstream relations for given component records, ignores existing relations
     async function insertUpstreamRels(targetComp, relSources = [], trx = knex) {
         is.valid(is.objectWithProps(compProps), is.maybeArray, is.maybeObject, arguments);
@@ -415,14 +406,19 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         async function getRelatedCompRecords() {
             return Promise.all(
                 _.map((k) =>
-                    selectRecordsById(comps[k](), _.uniq(compCalls[k])).then((result) => ({ name: k, result }))
+                    selectRecords(comps[k](), {
+                        where: (query) => query.whereIn('id', _.uniq(compCalls[k])),
+                        limit: -1,
+                    }).then((result) => ({ name: k, result }))
                 )(_.keys(compCalls))
             );
         }
         // Removes the duplicate records created as a side effect of upstream/downstream record processing
         function removeDuplicates(result, compName) {
             is.valid(is.maybeObject, is.string, arguments);
-            return { [compName]: _.slice(0, _.get('length')(_.get(compName, result)) / 2)(_.get(compName, result)) };
+            const compResult = _.get(compName)(result);
+            const halfLength = _.get('length')(compResult) / 2;
+            return { [compName]: _.slice(0, halfLength)(compResult) };
         }
 
         filters.upstreamLimit = _.isUndefined(filters.upstreamLimit) ? 10 : filters.upstreamLimit;
