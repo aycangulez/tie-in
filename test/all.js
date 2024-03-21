@@ -44,7 +44,7 @@ describe('comp', function () {
 
     it('updates user', async function () {
         const now = new Date();
-        await comp.updateById(user({ id: 1, email: 'asuka@localhost', updatedAt: now }));
+        await comp.update(user({ id: 1 }), user({ email: 'asuka@localhost', updatedAt: now }));
         const user1 = await comp.get(user({ id: 1 }));
         user1.should.have.nested
             .include({ 'user[0].self.username': 'Asuka' })
