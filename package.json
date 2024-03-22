@@ -9,7 +9,7 @@
     "author": "Aycan Gulez",
     "license": "MIT",
     "dependencies": {
-        "fn-arg-validator": "^1.0.7",
+        "fn-arg-validator": "^1.1.1",
         "fn-one": "^1.0.1",
         "knex": "^3.1.0",
         "lodash": "^4.17.21"
