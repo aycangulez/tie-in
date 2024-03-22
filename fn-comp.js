@@ -78,13 +78,13 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         // Generates one or more exists conditions to filter results (effectively an inner join)
         function generateExistsConditon(filterComp) {
             is.valid(is.objectWithProps(compProps), arguments);
-            return trx
-                .from(tablePrefix + 'rel')
-                .select(tablePrefix + 'rel.target_id')
-                .where(tablePrefix + 'rel.source_comp', filterComp.name)
-                .andWhere(tablePrefix + 'rel.source_id', _.get('id')(filterComp.data()))
-                .andWhere(tablePrefix + 'rel.target_comp', comp.name)
-                .andWhereRaw(tablePrefix + 'rel.target_id = ' + tablePrefix + comp.name + '.id');
+            const relTable = tablePrefix + 'rel';
+            return trx(relTable)
+                .select(relTable + '.target_id')
+                .where(relTable + '.source_comp', filterComp.name)
+                .andWhere(relTable + '.source_id', _.get('id')(filterComp.data()))
+                .andWhere(relTable + '.target_comp', comp.name)
+                .andWhereRaw(relTable + '.target_id = ' + tablePrefix + comp.name + '.id');
         }
         // Converts given query to an aggregate query
         function handleAgregates(query) {
