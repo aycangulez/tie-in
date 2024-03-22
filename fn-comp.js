@@ -19,6 +19,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         filterUpstreamBy: is.maybeArray,
         aggregate: is.maybeArray,
         where: is.maybeFunc,
+        group: is.maybeObject,
         orderBy: is.maybeArray,
         offset: is.maybeNumber,
         limit: is.maybeNumber,
@@ -73,22 +74,10 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
 
     // Modifies a query according to filter options
     function queryFilterModifier(query, filters = {}) {
-        query
-            .orderBy(...(_.flow(_.get('orderBy'), _.isArray)(filters) ? filters.orderBy : ['id']))
-            .offset(_.get('offset')(filters) || 0);
-        const aggregateFuncs = _.get('aggregate')(filters);
-        if (aggregateFuncs) {
-            query.clear('select');
-            query.clear('order');
+        if (filters.orderBy) {
+            query.orderBy(filters.orderBy);
         }
-        _.each((v) => {
-            const fn = _.get('fn')(v);
-            const availableFns = ['avg', 'avgDistinct', 'count', 'countDistinct', 'min', 'max', 'sum', 'sumDistinct'];
-            if (_.indexOf(fn)(availableFns) !== -1) {
-                const argVal = _.flow(_.get('args'), _.trim)(v);
-                query[fn]({ [fn]: argVal === '*' ? '*' : _.snakeCase(argVal) });
-            }
-        })(aggregateFuncs);
+        query.offset(_.get('offset')(filters) || 0);
         query.andWhere(filters.where || (() => {}));
         const limit = _.get('limit')(filters) || 10;
         if (limit !== -1) {
@@ -100,15 +89,52 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
     // Selects component records
     async function selectRecords(comp, filters, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.objectWithProps(getFilterProps), is.maybeObject, arguments);
+        // Generates one or more exists conditions to filter results (effectively an inner join)
         function generateExistsConditon(filterComp) {
             is.valid(is.objectWithProps(compProps), arguments);
             return trx
                 .from(tablePrefix + 'rel')
-                .select('rel.target_id')
-                .where('rel.source_comp', filterComp.name)
-                .andWhere('rel.source_id', _.get('id')(filterComp.data()))
-                .andWhere('rel.target_comp', comp.name)
-                .andWhereRaw('rel.target_id = ' + comp.name + '.id');
+                .select(tablePrefix + 'rel.target_id')
+                .where(tablePrefix + 'rel.source_comp', filterComp.name)
+                .andWhere(tablePrefix + 'rel.source_id', _.get('id')(filterComp.data()))
+                .andWhere(tablePrefix + 'rel.target_comp', comp.name)
+                .andWhereRaw(tablePrefix + 'rel.target_id = ' + tablePrefix + comp.name + '.id');
+        }
+        // Converts given query to an aggregate query
+        function handleAgregates(query) {
+            const aggregateFuncs = _.get('aggregate')(filters);
+            const availableFuncs = ['avg', 'avgDistinct', 'count', 'countDistinct', 'min', 'max', 'sum', 'sumDistinct'];
+            if (aggregateFuncs && !filters.group) {
+                query.clear('select');
+            }
+            _.each((v) => {
+                const fn = _.get('fn')(v);
+                if (_.indexOf(fn)(availableFuncs) !== -1) {
+                    const argVal = _.flow(_.get('args'), _.trim)(v);
+                    query[fn]({ [fn]: argVal === '*' ? '*' : _.snakeCase(argVal) });
+                }
+            })(aggregateFuncs);
+            return query;
+        }
+        // Creates a group by query with given query as its subquery
+        function handleGroupBy(query) {
+            const group = _.get('group')(filters);
+            if (!group) {
+                return handleAgregates(query);
+            }
+            const groupTable = tablePrefix + group.by.name;
+            const relTable = tablePrefix + 'rel';
+            const groupByColumns = _.map((c) => groupTable + '.' + c)(group.columns);
+            query.clear('select').select(tablePrefix + comp.name + '.id'); // Turn to subquery
+            return handleAgregates(
+                trx(relTable)
+                    .select(groupByColumns)
+                    .leftJoin(groupTable, relTable + '.source_id', groupTable + '.id')
+                    .where(relTable + '.source_comp', 'user')
+                    .andWhere(relTable + '.target_comp', comp.name)
+                    .whereIn(relTable + '.target_id', query)
+                    .groupBy(groupByColumns)
+            );
         }
         const query = trx(tablePrefix + comp.name)
             .select()
@@ -122,7 +148,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
                     : generateExistsConditon(_.head(relatedComps))
             );
         }
-        return query.modify(queryFilterModifier, filters);
+        return handleGroupBy(query).modify(queryFilterModifier, filters);
     }
 
     // Inserts upstream relations for given component records, ignores existing relations
@@ -203,7 +229,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
                   )
                 : {};
         for (let i = 0, cLen = compRecs.length; i < cLen; i++) {
-            result[comp.name].push({ self: compRecs[i] });
+            result[comp.name].push({ [filters.aggregate ? 'aggregate' : 'self']: compRecs[i] });
             let relRecs = allRelRecs[compRecs[i].id] || [];
             for (const relRec of relRecs) {
                 let sourceComp = comps[relRec.sourceComp]({ id: relRec.sourceId });
@@ -253,7 +279,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
                   )
                 : {};
         for (let i = 0, cLen = compRecs.length; i < cLen; i++) {
-            result[comp.name].push({ self: compRecs[i] });
+            result[comp.name].push({ [filters.aggregate ? 'aggregate' : 'self']: compRecs[i] });
             let relRecs = allRelRecs[compRecs[i].id] || [];
             for (const relRec of relRecs) {
                 let targetComp = comps[relRec.targetComp]({ id: relRec.targetId });

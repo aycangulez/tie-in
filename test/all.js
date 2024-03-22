@@ -5,7 +5,7 @@ const knexConfig = {
     debug: false,
 };
 
-const comp = require('../fn-comp')(knexConfig);
+const comp = require('../fn-comp')(knexConfig, 'comp_');
 const knex = comp.knex;
 const user = require('../components/user')();
 const post = require('../components/post')();
@@ -18,7 +18,7 @@ const should = chai.should();
 
 async function clearDB() {
     const promises = [];
-    const tables = ['rel', 'user', 'post', 'topic'];
+    const tables = ['comp_rel', 'comp_user', 'comp_post', 'comp_topic'];
     _.each((v) => promises.push(knex.schema.dropTableIfExists(v)))(tables);
     return Promise.all(promises).then(() => comp.init([user, post, topic]));
 }
@@ -81,7 +81,7 @@ describe('comp', function () {
             upstream: [user({ id: 2, relType: 'author' }), topic({ id: 1, relType: 'parent' })],
         });
         await comp
-            .get(post(), { orderBy: ['createdAt', 'desc'] })
+            .get(post(), { orderBy: [{ column: 'createdAt', order: 'desc' }] })
             .should.eventually.have.nested.include({ 'post[0].self.content': 'Post 2' })
             .and.have.nested.include({ 'post[0].user[0].self.username': 'Katniss' })
             .and.have.nested.include({ 'post[0].topic[0].self.title': 'Topic 1' })
@@ -99,7 +99,7 @@ describe('comp', function () {
             .get(post(), {
                 upstreamLimit: 1,
                 filterUpstreamBy: [topic({ id: 1 })],
-                orderBy: ['createdAt', 'desc'],
+                orderBy: [{ column: 'createdAt', order: 'desc' }],
             })
             .should.eventually.have.nested.include({ 'post[0].self.content': 'Post 2' })
             .and.have.nested.include({ 'post[0].user[0].self.username': 'Katniss' })
@@ -114,7 +114,7 @@ describe('comp', function () {
             .get(post(), {
                 upstreamLimit: 1,
                 filterUpstreamBy: [topic({ id: 1 }), user({ id: 2 })],
-                orderBy: ['createdAt', 'desc'],
+                orderBy: [{ column: 'createdAt', order: 'desc' }],
             })
             .should.eventually.have.nested.include({ 'post[0].self.content': 'Post 2' })
             .and.have.nested.include({ 'post[0].user[0].self.username': 'Katniss' })
@@ -133,6 +133,41 @@ describe('comp', function () {
             .and.does.not.have.nested.include({ 'post[0].topic[0].self.title': 'Topic 2' });
     });
 
+    it('Counts posts', async function () {
+        await comp
+            .get(post(), { aggregate: [{ fn: 'count', args: '*' }] })
+            .should.eventually.have.nested.include({ 'post[0].aggregate.count': '3' });
+    });
+
+    it('Groups posts by user in descending username order', async function () {
+        const filters = {
+            aggregate: [{ fn: 'count', args: '*' }],
+            group: { by: user(), columns: ['id', 'username'] },
+            orderBy: [{ column: 'username', order: 'desc' }],
+        };
+        await comp
+            .get(post(), filters)
+            .should.eventually.have.nested.include({ 'post[0].aggregate.count': '2' })
+            .and.have.nested.include({ 'post[0].aggregate.username': 'Katniss' })
+            .and.have.nested.include({ 'post[1].aggregate.count': '1' })
+            .and.have.nested.include({ 'post[1].aggregate.username': 'Asuka' });
+    });
+
+    it('Groups posts by user in topic #1 in descending username order', async function () {
+        const filters = {
+            aggregate: [{ fn: 'count', args: '*' }],
+            filterUpstreamBy: [topic({ id: 1 })],
+            group: { by: user(), columns: ['id', 'username'] },
+            orderBy: [{ column: 'username', order: 'desc' }],
+        };
+        await comp
+            .get(post(), filters)
+            .should.eventually.have.nested.include({ 'post[0].aggregate.count': '1' })
+            .and.have.nested.include({ 'post[0].aggregate.username': 'Katniss' })
+            .and.have.nested.include({ 'post[1].aggregate.count': '1' })
+            .and.have.nested.include({ 'post[1].aggregate.username': 'Asuka' });
+    });
+
     it('Deletes a post and its relations', async function () {
         const postId = _.get('post[0].self.id')(await comp.get(post({ content: 'Post 3' }), { upstreamLimit: 0 }));
         const postRels = await comp.getRels(post({ id: postId }));
@@ -142,11 +177,5 @@ describe('comp', function () {
         const postRelsAfterDelete = await comp.getRels(post({ id: postId }));
         postAfterDelete.post.should.have.lengthOf(0);
         postRelsAfterDelete.upstream.should.have.lengthOf(0);
-    });
-
-    it('Counts posts', async function () {
-        await comp
-            .get(post(), { aggregate: [{ fn: 'count', args: '*' }] })
-            .should.eventually.have.nested.include({ 'post[0].self.count': '2' });
     });
 });
