@@ -72,20 +72,6 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
             .del();
     }
 
-    // Modifies a query according to filter options
-    function queryFilterModifier(query, filters = {}) {
-        if (filters.orderBy) {
-            query.orderBy(filters.orderBy);
-        }
-        query.offset(_.get('offset')(filters) || 0);
-        query.andWhere(filters.where || (() => {}));
-        const limit = _.get('limit')(filters) || 10;
-        if (limit !== -1) {
-            query.limit(limit);
-        }
-        return query;
-    }
-
     // Selects component records
     async function selectRecords(comp, filters, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.objectWithProps(getFilterProps), is.maybeObject, arguments);
@@ -136,6 +122,19 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
                     .groupBy(groupByColumns)
             );
         }
+        // Adds general filter options to given query
+        function addGeneralFilters(query, filters = {}) {
+            if (filters.orderBy) {
+                query.orderBy(filters.orderBy);
+            }
+            query.offset(_.get('offset')(filters) || 0);
+            query.andWhere(filters.where || (() => {}));
+            const limit = _.get('limit')(filters) || 10;
+            if (limit !== -1) {
+                query.limit(limit);
+            }
+            return query;
+        }
         const query = trx(tablePrefix + comp.name)
             .select()
             .columns(getColumnNamesForSelect(comp))
@@ -148,7 +147,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
                     : generateExistsConditon(_.head(relatedComps))
             );
         }
-        return handleGroupBy(query).modify(queryFilterModifier, filters);
+        return handleGroupBy(query).modify(addGeneralFilters, filters);
     }
 
     // Inserts upstream relations for given component records, ignores existing relations
