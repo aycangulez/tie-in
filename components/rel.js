@@ -1,31 +1,26 @@
-const is = require('fn-arg-validator');
+module.exports = (comp) => {
+    const is = comp.is;
+    const name = 'rel';
 
-function rel(compName = 'rel') {
-    const compSchema = {
-        get name() {
-            return compName;
-        },
-        async schema(knex, tablePrefix = '') {
-            is.valid(is.object, is.maybeString, arguments);
-            const tableName = tablePrefix + compName;
-            const exists = await knex.schema.hasTable(tableName);
-            if (!exists) {
-                return knex.schema.createTable(tableName, function (table) {
-                    table.increments('id').primary();
-                    table.string('source_comp').notNullable();
-                    table.integer('source_id').notNullable();
-                    table.string('target_comp').notNullable();
-                    table.integer('target_id').notNullable();
-                    table.string('type');
-                    table.timestamps(false, true);
-                    table.unique(['source_comp', 'source_id', 'target_comp', 'target_id', 'type']);
-                    table.index(['target_comp', 'target_id']);
-                });
-            }
-        },
-    };
+    async function schema(knex, tablePrefix = '') {
+        is.valid(is.object, is.maybeString, arguments);
+        const tableName = tablePrefix + name;
+        if (!(await knex.schema.hasTable(tableName))) {
+            return knex.schema.createTable(tableName, function (table) {
+                table.increments('id').primary();
+                table.string('source_comp').notNullable();
+                table.integer('source_id').notNullable();
+                table.string('target_comp').notNullable();
+                table.integer('target_id').notNullable();
+                table.string('type');
+                table.timestamps(false, true);
+                table.unique(['source_comp', 'source_id', 'target_comp', 'target_id', 'type']);
+                table.index(['target_comp', 'target_id']);
+            });
+        }
+    }
 
-    return function (input) {
+    function data(input) {
         is.valid(
             is.objectWithProps({
                 id: is.maybeNumber,
@@ -36,13 +31,10 @@ function rel(compName = 'rel') {
                 type: is.maybeString,
                 createdAt: is.maybeDate,
                 updatedAt: is.maybeDate,
-                relType: is.maybeString,
             }),
             arguments
         );
-        const compObject = Object.create(compSchema);
-        Object.defineProperty(compObject, 'relType', { value: input?.relType });
-        compObject.data = () => ({
+        return {
             id: input?.id,
             source_comp: input?.sourceComp,
             source_id: input?.sourceId,
@@ -51,9 +43,8 @@ function rel(compName = 'rel') {
             type: input?.type,
             created_at: input?.createdAt,
             updated_at: input?.updatedAt,
-        });
-        return compObject;
-    };
-}
+        };
+    }
 
-module.exports = rel;
+    return comp.define(name, schema, data);
+};

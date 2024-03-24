@@ -1,6 +1,6 @@
 {
     "name": "fn-comp",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "description": "Relational data component library.",
     "main": "fn-comp.js",
     "scripts": {
@@ -15,10 +15,10 @@
         "lodash": "^4.17.21"
     },
     "devDependencies": {
-        "chai": "^4.3.10",
+        "chai": "^4.4.1",
         "chai-as-promised": "^7.1.1",
         "chai-datetime": "^1.8.0",
-        "mocha": "^10.2.0",
+        "mocha": "^10.3.0",
         "pg": "^8.11.3"
     }
 }

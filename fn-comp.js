@@ -1,6 +1,5 @@
 const _ = require('lodash/fp');
 const chain = require('fn-one');
-const rel = require('./components/rel')();
 const memoizeWithResolver = _.memoize.convert({ fixed: false });
 
 const fnComp = function (knexConfig, tablePrefix = '', is) {
@@ -10,6 +9,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
     }
     is.valid(is.object, is.maybeString, is.maybeObject, arguments);
 
+    var rel;
     const knex = require('knex')(knexConfig);
     const comps = {};
     const compProps = { name: is.string, relType: is.maybeString, data: is.func, schema: is.func };
@@ -87,7 +87,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
                 .andWhereRaw(relTable + '.target_id = ' + tablePrefix + comp.name + '.id');
         }
         // Converts given query to an aggregate query
-        function handleAgregates(query) {
+        function handleAggregates(query) {
             const aggregateFuncs = _.get('aggregate')(filters);
             const availableFuncs = ['avg', 'avgDistinct', 'count', 'countDistinct', 'min', 'max', 'sum', 'sumDistinct'];
             if (aggregateFuncs && !filters.group) {
@@ -106,13 +106,13 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         function handleGroupBy(query) {
             const group = _.get('group')(filters);
             if (!group) {
-                return handleAgregates(query);
+                return handleAggregates(query);
             }
             const groupTable = tablePrefix + group.by.name;
             const relTable = tablePrefix + 'rel';
             const groupByColumns = _.map((c) => groupTable + '.' + c)(group.columns);
             query.clear('select').select(tablePrefix + comp.name + '.id'); // Turn to subquery
-            return handleAgregates(
+            return handleAggregates(
                 trx(relTable)
                     .select(groupByColumns)
                     .leftJoin(groupTable, relTable + '.source_id', groupTable + '.id')
@@ -350,6 +350,24 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         return trx ? steps(trx) : knex.transaction(steps);
     }
 
+    // Returns a custom component object
+    function define(compName, schemaFunc, dataFunc) {
+        is.valid(is.string, is.func, is.func, arguments);
+        const compSchema = {
+            get name() {
+                return compName;
+            },
+            schema: schemaFunc,
+        };
+        return function (input) {
+            is.valid(is.objectWithProps({ relType: is.maybeString }), arguments);
+            const compObject = Object.create(compSchema);
+            Object.defineProperty(compObject, 'relType', { value: input?.relType });
+            compObject.data = () => dataFunc(input);
+            return compObject;
+        };
+    }
+
     // Creates a component record and optionally its relations
     async function create(comp, rels, trx) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
@@ -458,9 +476,12 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
     }
 
     // Initializes the library by registering passed components and creating the necessary database schemas if necessary
-    async function init(compCollection = []) {
+    async function register(compCollection = []) {
         is.valid(is.maybeArray, arguments);
-        compCollection.push(rel);
+        if (!rel) {
+            rel = require('./components/rel')(this);
+            compCollection.push(rel);
+        }
         const componetSchemas = _.map((comp) => comp().schema(knex, tablePrefix))(compCollection);
         await Promise.all(componetSchemas);
         _.each((comp) => (comps[comp().name] = comp))(compCollection);
@@ -472,11 +493,12 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         rel,
         createRels,
         getRels,
+        define,
         create,
         update,
         del,
         get,
-        init,
+        register,
     };
 };
 

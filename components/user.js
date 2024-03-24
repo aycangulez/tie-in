@@ -1,27 +1,21 @@
-const is = require('fn-arg-validator');
+module.exports = (comp) => {
+    const is = comp.is;
+    const name = 'user';
 
-function user(compName = 'user') {
-    const compSchema = {
-        get name() {
-            return compName;
-        },
-        async schema(knex, tablePrefix = '') {
-            is.valid(is.object, is.maybeString, arguments);
-            const tableName = tablePrefix + compName;
-            const exists = await knex.schema.hasTable(tableName);
-            if (!exists) {
-                return knex.schema.createTable(tableName, function (table) {
-                    table.increments('id').primary();
-                    table.string('username').notNullable();
-                    table.string('email').notNullable();
-                    table.timestamps(false, true);
-                    table.unique('email');
-                });
-            }
-        },
-    };
+    async function schema(knex, tablePrefix = '') {
+        const tableName = tablePrefix + name;
+        if (!(await knex.schema.hasTable(tableName))) {
+            return knex.schema.createTable(tableName, function (table) {
+                table.increments('id').primary();
+                table.string('username').notNullable();
+                table.string('email').notNullable();
+                table.timestamps(false, true);
+                table.unique('email');
+            });
+        }
+    }
 
-    return function (input) {
+    function data(input) {
         is.valid(
             is.objectWithProps({
                 id: is.maybeNumber,
@@ -29,21 +23,17 @@ function user(compName = 'user') {
                 email: is.maybeString,
                 createdAt: is.maybeDate,
                 updatedAt: is.maybeDate,
-                relType: is.maybeString,
             }),
             arguments
         );
-        const compObject = Object.create(compSchema);
-        Object.defineProperty(compObject, 'relType', { value: input?.relType });
-        compObject.data = () => ({
+        return {
             id: input?.id,
             username: input?.username,
             email: input?.email,
             created_at: input?.createdAt,
             updated_at: input?.updatedAt,
-        });
-        return compObject;
-    };
-}
+        };
+    }
 
-module.exports = user;
+    return comp.define(name, schema, data);
+};

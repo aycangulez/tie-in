@@ -1,15 +1,14 @@
 const knexConfig = {
     client: 'pg',
     connection: process.env.FN_COMP_PG_CONNECTION_STRING,
-    searchPath: ['knex', 'public'],
     debug: false,
 };
 
 const comp = require('../fn-comp')(knexConfig, 'comp_');
 const knex = comp.knex;
-const user = require('../components/user')();
-const post = require('../components/post')();
-const topic = require('../components/topic')();
+const user = require('../components/user')(comp);
+const post = require('../components/post')(comp);
+const topic = require('../components/topic')(comp);
 const _ = require('lodash/fp');
 const chai = require('chai');
 chai.use(require('chai-datetime')).should();
@@ -20,7 +19,7 @@ async function clearDB() {
     const promises = [];
     const tables = ['comp_rel', 'comp_user', 'comp_post', 'comp_topic'];
     _.each((v) => promises.push(knex.schema.dropTableIfExists(v)))(tables);
-    return Promise.all(promises).then(() => comp.init([user, post, topic]));
+    return Promise.all(promises).then(() => comp.register([user, post, topic]));
 }
 
 describe('comp', function () {
@@ -64,21 +63,21 @@ describe('comp', function () {
     it('creates topic and associates with upstream user and downstream post', async function () {
         await comp.create(topic({ title: 'Topic 1' }), {
             upstream: [user({ id: 1, relType: 'starter' })],
-            downstream: [post({ id: 1, relType: 'parent' })],
+            downstream: [post({ id: 1, relType: 'child' })],
         });
         await comp
             .get(topic({ id: 1 }))
             .should.eventually.have.nested.include({ 'topic[0].self.title': 'Topic 1' })
             .and.have.nested.include({ 'topic[0].user[0].self.relType': 'starter' })
             .and.have.nested.include({ 'topic[0].user[0].self.username': 'Asuka' })
-            .and.have.nested.include({ 'topic[0].post[0].self.relType': 'parent' })
+            .and.have.nested.include({ 'topic[0].post[0].self.relType': 'child' })
             .and.have.nested.include({ 'topic[0].post[0].self.content': 'Post 1' });
     });
 
     it('adds post by new user to topic and gets posts in descending order', async function () {
         await comp.create(user({ username: 'Katniss', email: 'katniss@localhost' }));
         await comp.create(post({ content: 'Post 2' }), {
-            upstream: [user({ id: 2, relType: 'author' }), topic({ id: 1, relType: 'parent' })],
+            upstream: [user({ id: 2, relType: 'author' }), topic({ id: 1, relType: 'child' })],
         });
         await comp
             .get(post(), { orderBy: [{ column: 'createdAt', order: 'desc' }] })
