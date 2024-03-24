@@ -260,7 +260,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         );
         let compRecs;
         if (level === 0) {
-            compRecs = await selectRecords(comp, filters);
+            compRecs = await selectRecordsFunc(comp, filters);
         } else {
             compRecs = [{ id: _.get('id')(comp.data()), relType, _unresolved: comp.name }];
             saveCallsFunc(comp);
