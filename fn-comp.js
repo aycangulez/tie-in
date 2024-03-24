@@ -478,19 +478,23 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
     // Initializes the library by registering passed components and creating the necessary database schemas if necessary
     async function register(compCollection = []) {
         is.valid(is.maybeArray, arguments);
+        if (_.find((c) => c().name === 'rel')(compCollection)) {
+            throw new Error("'rel' is reserved component name.");
+        }
         if (!rel) {
             rel = require('./components/rel')(this);
             compCollection.push(rel);
         }
-        const componetSchemas = _.map((comp) => comp().schema(knex, tablePrefix))(compCollection);
-        await Promise.all(componetSchemas);
-        _.each((comp) => (comps[comp().name] = comp))(compCollection);
+        await Promise.all(_.map((c) => c().schema(knex, tablePrefix))(compCollection));
+        _.each((c) => (comps[c().name] = c))(compCollection);
     }
 
     return {
         knex,
         is,
-        rel,
+        get rel() {
+            return rel;
+        },
         createRels,
         getRels,
         define,

@@ -31,6 +31,10 @@ describe('comp', function () {
         await knex.destroy();
     });
 
+    it('checks invalid component registration', async function () {
+        await comp.register([comp.rel]).should.eventually.be.rejectedWith('reserved');
+    });
+
     it('creates user inside an external transaction', async function () {
         await knex.transaction(
             async (trx) => await comp.create(user({ username: 'Asuka', email: 'asuka@elsewhere' }), {}, trx)
