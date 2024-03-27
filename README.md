@@ -27,14 +27,14 @@ const post = require('./components/post')(tie);
 const topic = require('./components/topic')(tie);
 
 // Register the components we will use
-tie.register([user, post, topic]))
+tie.register([user, post, topic]);
 
 // Create a user named Asuka
-const userId = await tie.create(user({ name: 'Asuka', email: 'asuka@localhost', country: 'JP' });
+const userId = await tie.create(user({ name: 'Asuka', email: 'asuka@localhost', country: 'JP' }));
 
 // Create a post and make its author Asuka
 const postId = await tie.create(post({ content: 'Hi!' }), {
-    upstream: [user({ id: postId, relType: 'author' })]
+    upstream: [user({ id: userId, relType: 'author' })]
 });
 
 // Create a topic and make the topic starter Asuka, also make the post a child of this topic
@@ -187,13 +187,13 @@ When you pass a component to **tie.get**, it uses the component's fields for sea
 * `await tie.get(user( {country: 'JP', username: 'Asuka'} ))` returns the users from Japan having the username 'Asuka'.
 * `await tie.get(user())` returns all users.
 
-#### Filters:
+#### Filters
 
 **downstreamLimit:**
-Unless specified, Tie-in returns up to 10 levels of downstream relations for each record. You can set this to another number or 0 for none.
+Unless specified, get returns up to 10 levels of downstream relations for each record. You can set this to another number or 0 for none.
 
 **upstreamLimit:**
-Unless specified, Tie-in returns up to 10 levels of uptstream relations for each record. You can set this to another number or 0 for none.
+Unless specified, get returns up to 10 levels of uptstream relations for each record. You can set this to another number or 0 for none.
 
 **filterUpstreamBy:**
 Filters records by upstream relations. Effectively works like an inner join.
@@ -245,11 +245,9 @@ await tie.get(post(), { orderBy: [{ column: 'createdAt', order: 'desc' }] });
 Returns records starting at specified offset. Defaults to 0.
 
 **limit:**
-Limits the number of records returned. Unless specified, Tie-in returns 10 results. Set to -1 for no limit.
+Limits the number of records returned. Unless specified, get returns 10 results. Set to -1 for no limit.
 
----
-
-Finally, here's an example using multiple filters working together:
+Finally, here's an example that demonstrates multiple filters working together:
 
 ```js
 async function getPostCountsGroupedByUser(topicId) {
@@ -260,6 +258,61 @@ async function getPostCountsGroupedByUser(topicId) {
         orderBy: [{ column: 'username', order: 'asc' }],
         limit: -1,
     };
-    return await tie.get(post(), filters);
+    return tie.get(post(), filters);
 }
+```
+
+### Other Methods
+
+#### tie.register
+
+Syntax: `tie.register(compCollection = [])`
+
+All components must be registered by tie.register before use.
+
+```js
+// Register the user, post and topic components
+tie.register([user, post, topic]);
+```
+
+#### tie.create
+
+Syntax: `tie.create(comp, rels, trx)`
+
+Creates a component record (*comp*) and optionally its relations (*rels*). Returns the newly created component record's id on success. You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
+
+Relations can be upstream (referencing the newly created record) and/or downstream (referenced from the newly created record). Relations can optionally have types specified by *relType*.
+
+```js
+// Create a new topic
+const topicId = await tie.create(topic({ title: 'New Topic' }));
+// Then create a post, assign user #2 and topic #2 as its upstream relations
+const postId = await tie.create(post({ content: 'Something interesting' }), {
+    upstream: [user({ id: someUserId, relType: 'starter' }), topic({ id: topicId })],
+});
+```
+
+#### tie.update
+
+Syntax: `update(targetComp, targetFilters = {}, sourceComp, trx)`
+
+Updates matching target component records retrieved by using *targetComp* and  *targetFilters* with sourceComp's data. You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
+
+The *targetFilters* object can optionally contain the **filterByUpstream** and **where** properties as described under [tie.get filters](https://github.com/aycangulez/tie-in#filters).
+
+```js
+// Updates user #1's e-mail address and updatedAt fields
+await tie.update(user({ id: 1 }), {}, user({ email: 'asuka@elsewhere', updatedAt: new Date() }));
+```
+
+#### tie.del
+
+Syntax: `tie.del(comp, filters = {}, trx)`
+
+Deletes matching component records and their relations. You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
+
+The *filters* object can optionally contain the **filterByUpstream** and **where** properties as described under [tie.get filters](https://github.com/aycangulez/tie-in#filters).
+
+```js
+await tie.del(post({ id: somePostId }));
 ```

@@ -48,7 +48,7 @@ describe('tie-in', function () {
 
     it('updates user', async function () {
         const now = new Date();
-        await tie.update(user({ id: 1 }), user({ email: 'asuka@localhost', updatedAt: now }));
+        await tie.update(user({ id: 1 }), {}, user({ email: 'asuka@localhost', updatedAt: now }));
         const user1 = await tie.get(user({ id: 1 }));
         user1.should.have.nested
             .include({ 'user[0].self.username': 'Asuka' })

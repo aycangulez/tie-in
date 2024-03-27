@@ -328,19 +328,19 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
     }
 
     // Gets the relations for given component records
-    async function getRels(comp, trx) {
+    async function getRels(comp, filters = {}, trx) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
         async function steps(trx) {
             const rels = { upstream: [], downstream: [] };
             return chain(
-                () => selectRecords(comp, {}, trx),
+                () => getRecords(comp, filters, trx),
                 async (recs) => {
                     for (const rec of recs) {
                         rels.upstream.push(
-                            ...(await selectRecords(rel({ targetComp: comp.name, targetId: rec.id }), {}, trx))
+                            ...(await getRecords(rel({ targetComp: comp.name, targetId: rec.id }), {}, trx))
                         );
                         rels.downstream.push(
-                            ...(await selectRecords(rel({ sourceComp: comp.name, sourceId: rec.id }), {}, trx))
+                            ...(await getRecords(rel({ sourceComp: comp.name, sourceId: rec.id }), {}, trx))
                         );
                     }
                     return rels;
@@ -380,27 +380,31 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         return trx ? steps(trx) : knex.transaction(steps);
     }
 
-    // Gets records using filters
+    // Gets records using relevant filters
     function getRecords(comp, filters = {}, trx = knex) {
         is.valid(is.objectWithProps(compProps), is.objectWithProps(getFilterProps), is.maybeObject, arguments);
-        return selectRecords(comp, { ...filters, aggregate: undefined, limit: filters.limit || -1 }, trx);
+        return selectRecords(
+            comp,
+            { ...filters, aggregate: undefined, group: undefined, limit: filters.limit || -1 },
+            trx
+        );
     }
 
     // Updates source component records with target component's data
-    async function update(sourceComp, targetComp, filters = {}, trx = knex) {
+    async function update(targetComp, targetFilters = {}, sourceComp, trx) {
         is.valid(
             is.objectWithProps(compProps),
-            is.objectWithProps(compProps),
             is.objectWithProps(getFilterProps),
+            is.objectWithProps(compProps),
             is.maybeObject,
             arguments
         );
         async function steps(trx) {
             return chain(
-                () => getRecords(sourceComp, filters, trx),
+                () => getRecords(targetComp, targetFilters, trx),
                 async (recs) => {
                     for (const rec of recs) {
-                        await updateRecord(rec.id, targetComp, trx);
+                        await updateRecord(rec.id, sourceComp, trx);
                     }
                 }
             );
