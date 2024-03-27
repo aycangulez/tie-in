@@ -1,6 +1,6 @@
 # Tie-in
 
-Tie-in is a relational data component library that makes it easy to store and query records that can be related to any other record.
+Tie-in is a relational data component library that lets you store and query records that can be related to any other record.
 
 ## Installation
 
@@ -30,7 +30,7 @@ const topic = require('./components/topic')(tie);
 tie.register([user, post, topic]))
 
 // Create a user named Asuka
-const userId = await tie.create(user({ username: 'Asuka', email: 'asuka@localhost' });
+const userId = await tie.create(user({ name: 'Asuka', email: 'asuka@localhost', country: 'JP' });
 
 // Create a post and make its author Asuka
 const postId = await tie.create(post({ content: 'Hi!' }), {
@@ -65,6 +65,7 @@ console.log(await tie.get(topic( {id: topicId} )));
                         "id": 1,
                         "username": "Asuka",
                         "email": "asuka@localhost",
+                        "country": "JP",
                         "createdAt": "2024-03-23T20:45:45.107Z",
                         "updatedAt": "2024-03-23T20:45:45.107Z"
                     }
@@ -90,7 +91,7 @@ console.log(await tie.get(topic( {id: topicId} )));
 
 The relations in a database are usually defined between columns across tables. In Tie-in, however, relations can be defined between individual records. Relations can also have types, so you can have multiple relations between two records.
 
-The ability to associate a record with any other record on any table opens up new possibilities that are hard to accomplish with the traditional column-based relations. Also, since relations are dynamic, no schema changes are necessary to define new relations.
+The ability to associate a record with any other record in any table opens up new possibilities that are hard to accomplish with the traditional column-based relations. Also, since relations are dynamic, no schema changes are necessary to define new relations.
 
 ### Defining Components
 
@@ -115,7 +116,9 @@ module.exports = (tie) => {
                 table.increments('id').primary();
                 table.string('username').notNullable();
                 table.string('email').notNullable();
+                table.string('country', 2);
                 table.timestamps(false, true);
+                table.unique('username');
                 table.unique('email');
             });
         }
@@ -126,6 +129,7 @@ module.exports = (tie) => {
             id: input?.id,
             username: input?.username,
             email: input?.email,
+            country: input?.country,
             created_at: input?.createdAt,
             updated_at: input?.updatedAt,
         };
@@ -173,4 +177,91 @@ module.exports = (tie) => {
 
     return tie.define(name, schema, data);
 };
+```
+
+### All about tie.get
+
+Syntax: `tie.get(comp, filters = {})`
+
+When you pass a component to **tie.get**, it uses the component's fields for search. Here are some examples:
+
+* `await tie.get(user( {country: 'JP'} ))` returns users from Japan.
+* `await tie.get(user( {country: 'JP', username: 'Asuka'} ))` returns users from Japan having the username 'Asuka'.
+* `await tie.get(user())` returns all users.
+
+#### Filters:
+
+**downstreamLimit:**
+Unless specified, Tie-in returns up to 10 levels of downstream relations for each record. You can set this to another number or 0 for none.
+
+**upstreamLimit:**
+Unless specified, Tie-in returns up to 10 levels of uptstream relations for each record. You can set this to another number or 0 for none.
+
+**filterUpstreamBy:**
+Filters records by upstream relations. Effectively works like an inner join.
+
+```js
+// Returns posts in topic #1
+await tie.get(post(), { filterUpstreamBy: [topic({ id: 1 })] });
+
+// Returns posts in topic #1 by user #2
+await tie.get(post(), { filterUpstreamBy: [topic({ id: 1 }), user({ id: 2 })] });
+```
+
+**where:** 
+Lets you use custom where clauses. For all available options, refer to [knex's documentation](https://knexjs.org/guide/query-builder.html#where-clauses). Note: Column names must be in snake_case when using this filter.
+
+```js
+// Returns topics created in 2024
+await tie.get(topic(), { where: (query) => query.where('created_at', '>=', new Date('2024-01-01) });
+```
+
+**aggregate:**
+Runs an aggregate query. The following aggregate functions are supported: 'avg', 'avgDistinct', 'count', 'countDistinct', 'min', 'max', 'sum', 'sumDistinct'.
+
+```js
+// Returns post count
+await tie.get(post(), { aggregate: [{ fn: 'count', args: '*' }] })
+```
+
+**group:**
+Groups records. Must be used with an aggregate query.
+
+```js
+// Returns the number of posts made by each user
+await tie.get(post(), {
+    aggregate: [{ fn: 'count', args: '*' }],
+    group: { by: user(), columns: ['id', 'username'] },
+);    
+```
+
+**orderBy:**
+Orders records by given criteria.
+
+```js
+// Returns posts order by date in descending order
+await tie.get(post(), { orderBy: [{ column: 'createdAt', order: 'desc' }] });
+```
+
+**offset:**
+Returns records starting at specified offset. Defaults to 0.
+
+**limit:**
+Limits the number of records returned. Unless specified, Tie-in returns 10 results. Set to -1 for no limit.
+
+---
+
+Finally, here's an example using multiple filters working together:
+
+```js
+function getPostCountsGroupedByUser(topicId) {
+    const filters = {
+        aggregate: [{ fn: 'count', args: '*' }],
+        group: { by: user(), columns: ['id', 'username'] },
+        filterUpstreamBy: [topic({ id: topicId })],
+        orderBy: [{ column: 'username', order: 'asc' }],
+        limit: -1
+    };
+    return await tie.get(post(), filters);
+}
 ```

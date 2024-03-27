@@ -37,7 +37,8 @@ describe('tie-in', function () {
 
     it('creates user inside an external transaction', async function () {
         await knex.transaction(
-            async (trx) => await tie.create(user({ username: 'Asuka', email: 'asuka@elsewhere' }), {}, trx)
+            async (trx) =>
+                await tie.create(user({ username: 'Asuka', email: 'asuka@elsewhere', country: 'JP' }), {}, trx)
         );
         await tie
             .get(user({ id: 1 }))

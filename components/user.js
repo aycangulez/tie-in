@@ -9,7 +9,9 @@ module.exports = (tie) => {
                 table.increments('id').primary();
                 table.string('username').notNullable();
                 table.string('email').notNullable();
+                table.string('country', 2);
                 table.timestamps(false, true);
+                table.unique('username');
                 table.unique('email');
             });
         }
@@ -21,6 +23,7 @@ module.exports = (tie) => {
                 id: is.maybeNumber,
                 username: is.maybeString,
                 email: is.maybeString,
+                country: is.maybeString,
                 createdAt: is.maybeDate,
                 updatedAt: is.maybeDate,
             }),
@@ -30,6 +33,7 @@ module.exports = (tie) => {
             id: input?.id,
             username: input?.username,
             email: input?.email,
+            country: input?.country,
             created_at: input?.createdAt,
             updated_at: input?.updatedAt,
         };
