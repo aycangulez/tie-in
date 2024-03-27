@@ -8,9 +8,15 @@ Tie-in is a relational data component library that lets you store and query reco
 npm install --save tie-in
 ```
 
+Depending on the database(s) you intend to use, you may also need to install one or more of the following database drivers: pg, pg-native, sqlite3, better-sqlite3, mysql, mysql2, oracledb, tedious (for mssql). For example,
+
+```bash
+npm install --save pg
+```
+
 ## Usage
 
-First, let's go over a quick example where we model a simple forum.
+First, let's explore a simple example by modeling a basic forum.
 
 By using predefined components (more on this later), we create a user, a post, and a topic in the relational database of our choice (in this case PostgreSQL):
 
