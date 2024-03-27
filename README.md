@@ -98,9 +98,7 @@ The ability to associate a record with any other record in any table opens up ne
 To define a component, you call **tie.define** with the following arguments.
 
 * **name:** Name of the component
-
 * **schema:** A function that defines the database table schema. Tie-in uses [knex](https://knexjs.org) under the hood. Table field names must be in snake_case for maximum compatibility across different database systems. Tie-in does the snake-case to camelCase conversions and vice versa automatically. The schema function is called when you register components with **tie.register**, and *knex* and *tablePrefix* are passed as arguments to it.
-
 * **data:** A function that accepts an object with field names in camelCase, maps those fields to the database table fields created with schema, and returns the resulting object.
 
 In its simplest form, a component definition should look like the example below. The only requirement is that there must be a field named *id* that uniquely identifies each record.
@@ -185,8 +183,8 @@ Syntax: `tie.get(comp, filters = {})`
 
 When you pass a component to **tie.get**, it uses the component's fields for search. Here are some examples:
 
-* `await tie.get(user( {country: 'JP'} ))` returns users from Japan.
-* `await tie.get(user( {country: 'JP', username: 'Asuka'} ))` returns users from Japan having the username 'Asuka'.
+* `await tie.get(user( {country: 'JP'} ))` returns the users from Japan.
+* `await tie.get(user( {country: 'JP', username: 'Asuka'} ))` returns the users from Japan having the username 'Asuka'.
 * `await tie.get(user())` returns all users.
 
 #### Filters:
@@ -213,7 +211,7 @@ Lets you use custom where clauses. For all available options, refer to [knex's d
 
 ```js
 // Returns topics created in 2024
-await tie.get(topic(), { where: (query) => query.where('created_at', '>=', new Date('2024-01-01) });
+await tie.get(topic(), { where: (query) => query.where('created_at', '>=', new Date('2024-01-01')) });
 ```
 
 **aggregate:**
@@ -221,7 +219,7 @@ Runs an aggregate query. The following aggregate functions are supported: 'avg',
 
 ```js
 // Returns post count
-await tie.get(post(), { aggregate: [{ fn: 'count', args: '*' }] })
+await tie.get(post(), { aggregate: [{ fn: 'count', args: '*' }] });
 ```
 
 **group:**
@@ -232,7 +230,7 @@ Groups records. Must be used with an aggregate query.
 await tie.get(post(), {
     aggregate: [{ fn: 'count', args: '*' }],
     group: { by: user(), columns: ['id', 'username'] },
-);    
+}); 
 ```
 
 **orderBy:**
@@ -254,13 +252,13 @@ Limits the number of records returned. Unless specified, Tie-in returns 10 resul
 Finally, here's an example using multiple filters working together:
 
 ```js
-function getPostCountsGroupedByUser(topicId) {
+async function getPostCountsGroupedByUser(topicId) {
     const filters = {
         aggregate: [{ fn: 'count', args: '*' }],
         group: { by: user(), columns: ['id', 'username'] },
         filterUpstreamBy: [topic({ id: topicId })],
         orderBy: [{ column: 'username', order: 'asc' }],
-        limit: -1
+        limit: -1,
     };
     return await tie.get(post(), filters);
 }
