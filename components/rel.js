@@ -1,8 +1,8 @@
-module.exports = (comp) => {
-    const is = comp.is;
+module.exports = (tie) => {
     const name = 'rel';
+    const is = tie.is;
 
-    async function schema(knex, tablePrefix = '') {
+    async function schema(knex, tablePrefix) {
         is.valid(is.object, is.maybeString, arguments);
         const tableName = tablePrefix + name;
         if (!(await knex.schema.hasTable(tableName))) {
@@ -46,5 +46,5 @@ module.exports = (comp) => {
         };
     }
 
-    return comp.define(name, schema, data);
+    return tie.define(name, schema, data);
 };

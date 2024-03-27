@@ -1,8 +1,8 @@
-module.exports = (comp) => {
-    const is = comp.is;
+module.exports = (tie) => {
     const name = 'user';
+    const is = tie.is;
 
-    async function schema(knex, tablePrefix = '') {
+    async function schema(knex, tablePrefix) {
         const tableName = tablePrefix + name;
         if (!(await knex.schema.hasTable(tableName))) {
             return knex.schema.createTable(tableName, function (table) {
@@ -35,5 +35,5 @@ module.exports = (comp) => {
         };
     }
 
-    return comp.define(name, schema, data);
+    return tie.define(name, schema, data);
 };

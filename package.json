@@ -1,11 +1,12 @@
 {
-    "name": "fn-comp",
+    "name": "tie-in",
     "version": "0.1.0",
     "description": "Relational data component library.",
     "main": "fn-comp.js",
     "scripts": {
         "test": "mocha"
     },
+    "homepage": "https://github.com/aycangulez/tie-in",
     "author": "Aycan Gulez",
     "license": "MIT",
     "dependencies": {
