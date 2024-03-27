@@ -30,7 +30,7 @@ const topic = require('./components/topic')(tie);
 tie.register([user, post, topic]);
 
 // Create a user named Asuka
-const userId = await tie.create(user({ name: 'Asuka', email: 'asuka@localhost', country: 'JP' }));
+const userId = await tie.create(user({ username: 'Asuka', email: 'asuka@localhost', country: 'JP' }));
 
 // Create a post and make its author Asuka
 const postId = await tie.create(post({ content: 'Hi!' }), {
