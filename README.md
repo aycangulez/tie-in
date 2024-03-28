@@ -8,7 +8,7 @@ Tie-in is a relational data component library that lets you store and query reco
 npm install --save tie-in
 ```
 
-Depending on the database(s) you intend to use, you may also need to install one or more of the following database drivers: pg, pg-native, sqlite3, better-sqlite3, mysql, mysql2, oracledb, tedious (for mssql). For example,
+Depending on the database(s) you intend to use, you may also need to install one or more of the following database drivers: pg, pg-native, sqlite3, better-sqlite3, mysql, mysql2, oracledb, tedious (mssql). For example:
 
 ```bash
 npm install --save pg
@@ -18,7 +18,7 @@ npm install --save pg
 
 First, let's explore a simple example by modeling a basic forum.
 
-By using predefined components (more on this later), we create a user, a post, and a topic in the relational database of our choice (in this case PostgreSQL):
+By using data components (more on how to define them later), we create a user, a post, and a topic in the relational database of our choice (in this case PostgreSQL):
 
 ```js
 const dbConfig = {
@@ -26,70 +26,76 @@ const dbConfig = {
     connection: 'postgresql://localhost/me'
 };
 
-// Load tie-in and data component definitions
+// Load Tie-in and data component definitions
 const tie = require('tie-in')(dbConfig);
 const user = require('./components/user')(tie);
 const post = require('./components/post')(tie);
 const topic = require('./components/topic')(tie);
 
-// Register the components we will use
-tie.register([user, post, topic]);
+async function firstSteps() {
+    // Register the components we will use
+    await tie.register([user, post, topic]);
 
-// Create a user named Asuka
-const userId = await tie.create(user({ username: 'Asuka', email: 'asuka@localhost', country: 'JP' }));
+    // Create a user named Asuka
+    const userId = await tie.create(user({ username: 'Asuka', email: 'asuka@localhost', country: 'JP' }));
 
-// Create a post and make its author Asuka
-const postId = await tie.create(post({ content: 'Hi!' }), {
-    upstream: [user({ id: userId, relType: 'author' })]
-});
+    // Create a post and make its author Asuka
+    const postId = await tie.create(post({ content: 'Hi!' }), {
+        upstream: [user({ id: userId, relType: 'author' })],
+    });
 
-// Create a topic and make the topic starter Asuka, also make the post a child of this topic
-const topicId = await tie.create(topic({ title: 'First Topic' }), {
-    upstream: [user({ id: userId, relType: 'starter' })],
-    downstream: [post({ id: postId, relType: 'child' })],
-});
+    // Create a topic and make the topic starter Asuka, also make the post a child of this topic
+    const topicId = await tie.create(topic({ title: 'First Topic' }), {
+        upstream: [user({ id: userId, relType: 'starter' })],
+        downstream: [post({ id: postId, relType: 'child' })],
+    });
+
+    // Retrieve topic and its relations
+    const topicRecs = await tie.get(topic({ id: topicId }));
+    console.log(JSON.stringify(topicRecs, null, 2));
+}
+
+firstSteps();
 ```
 
-Now the individual records and their relations are in place, we can retrieve the newly created topic with **tie.get**,  which retrieves all the relations grouped together.
+Once the individual records and their relations are in place, we retrieve the newly created topic with **tie.get**,  which retrieves all the relations grouped together.
 
-```js
-console.log(await tie.get(topic( {id: topicId} )));
-
+```json
 {
-    "topic": [
+  "topic": [
+    {
+      "self": {
+        "id": 1,
+        "title": "First Topic",
+        "createdAt": "2024-03-28T12:27:51.542Z",
+        "updatedAt": "2024-03-28T12:27:51.542Z"
+      },
+      "user": [
         {
-            "self": {
-                "id": 1,
-                "title": "First Topic",
-                "createdAt": "2024-03-23T20:45:45.131Z",
-                "updatedAt": "2024-03-23T20:45:45.131Z"
-            },
-            "user": [
-                {
-                    "self": {
-                        "relType": "starter",
-                        "id": 1,
-                        "username": "Asuka",
-                        "email": "asuka@localhost",
-                        "country": "JP",
-                        "createdAt": "2024-03-23T20:45:45.107Z",
-                        "updatedAt": "2024-03-23T20:45:45.107Z"
-                    }
-                }
-            ],
-            "post": [
-                {
-                    "self": {
-                        "relType": "child",
-                        "id": 1,
-                        "content": "Hi!",
-                        "createdAt": "2024-03-23T20:45:45.124Z",
-                        "updatedAt": "2024-03-23T20:45:45.124Z"
-                    }
-                }
-            ]
+          "self": {
+            "relType": "starter",
+            "id": 1,
+            "username": "Asuka",
+            "email": "asuka@localhost",
+            "country": "JP",
+            "createdAt": "2024-03-28T12:27:51.531Z",
+            "updatedAt": "2024-03-28T12:27:51.531Z"
+          }
         }
-    ]
+      ],
+      "post": [
+        {
+          "self": {
+            "relType": "child",
+            "id": 1,
+            "content": "Hi!",
+            "createdAt": "2024-03-28T12:27:51.538Z",
+            "updatedAt": "2024-03-28T12:27:51.538Z"
+          }
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -183,11 +189,13 @@ module.exports = (tie) => {
 };
 ```
 
+**Note:** The component files used in the examples can be found in "./node_modules/tie-in/components/".
+
 ### All about tie.get
 
 Syntax: `tie.get(comp, filters = {})`
 
-When you pass a component to **tie.get**, it uses the component's fields for search. Here are some examples:
+When you pass a component to **tie.get**, it uses the arguments passed to the component for search. Here are some examples:
 
 * `await tie.get(user( {country: 'JP'} ))` returns the users from Japan.
 * `await tie.get(user( {country: 'JP', username: 'Asuka'} ))` returns the users from Japan having the username 'Asuka'.
@@ -199,10 +207,10 @@ When you pass a component to **tie.get**, it uses the component's fields for sea
 Unless specified, get returns up to 10 levels of downstream relations for each record. You can set this to another number or 0 for none.
 
 **upstreamLimit:**
-Unless specified, get returns up to 10 levels of uptstream relations for each record. You can set this to another number or 0 for none.
+Unless specified, get returns up to 10 levels of upstream relations for each record. You can set this to another number or 0 for none.
 
 **filterUpstreamBy:**
-Filters records by upstream relations. Effectively works like an inner join.
+Filters records by upstream relations. Similar to an inner join.
 
 ```js
 // Returns posts in topic #1
@@ -213,7 +221,7 @@ await tie.get(post(), { filterUpstreamBy: [topic({ id: 1 }), user({ id: 2 })] })
 ```
 
 **where:** 
-Lets you use custom where clauses. For all available options, refer to [knex's documentation](https://knexjs.org/guide/query-builder.html#where-clauses). Note: Column names must be in snake_case when using this filter.
+Lets you use custom where clauses. For all available options, you can refer to [knex's documentation](https://knexjs.org/guide/query-builder.html#where-clauses). Note: Column names must be in snake_case when using this filter.
 
 ```js
 // Returns topics created in 2024
@@ -251,7 +259,7 @@ await tie.get(post(), { orderBy: [{ column: 'createdAt', order: 'desc' }] });
 Returns records starting at specified offset. Defaults to 0.
 
 **limit:**
-Limits the number of records returned. Unless specified, get returns 10 results. Set to -1 for no limit.
+Limits the number of records returned. Unless specified, get returns up to 10 results. Set to -1 for no limit.
 
 Finally, here's an example that demonstrates multiple filters working together:
 
@@ -274,7 +282,7 @@ async function getPostCountsGroupedByUser(topicId) {
 
 Syntax: `tie.register(compCollection = [])`
 
-All components must be registered by tie.register before use.
+All components must be registered with this method before use. Calls each component's schema method.
 
 ```js
 // Register the user, post and topic components
@@ -292,7 +300,7 @@ Relations can be upstream (referencing the newly created record) and/or downstre
 ```js
 // Create a new topic
 const topicId = await tie.create(topic({ title: 'New Topic' }));
-// Then create a post, assign user #2 and topic #2 as its upstream relations
+// Then create a post, assign a user and the newly created topic as its upstream relations
 const postId = await tie.create(post({ content: 'Something interesting' }), {
     upstream: [user({ id: someUserId, relType: 'starter' }), topic({ id: topicId })],
 });
@@ -322,3 +330,69 @@ The *filters* object can optionally contain the **filterByUpstream** and **where
 ```js
 await tie.del(post({ id: somePostId }));
 ```
+
+#### tie.createRels
+
+Syntax: `createRels(comp, rels, trx)`
+
+Creates relations (*rels*) for a component (*comp*). You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
+
+Relations can be upstream (referencing the newly created record) and/or downstream (referenced from the record). Relations can optionally have types specified by *relType*.
+
+```js
+await tie.createRels(post({ id: somePostId }), {
+    upstream: [user({ id: someUserId }), topic({ id: someTopicId })],
+});
+```
+
+#### tie.getRels
+
+Syntax: `getRels(comp, filters = {}, trx)`
+
+Retrieves the relationship mappings for matching component records. You can pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
+
+The *filters* object can optionally contain the **filterByUpstream** and **where** properties as described under [tie.get filters](https://github.com/aycangulez/tie-in#filters).
+
+```js
+await tie.getRels(post({ id: 3 }));
+```
+
+The output will be in the following format:
+
+```json
+{
+  "upstream": [
+    {
+      "id": 6,
+      "sourceComp": "user",
+      "sourceId": 2,
+      "targetComp": "post",
+      "targetId": 3,
+      "type": null,
+      "createdAt": "2024-03-28T13:28:59.175Z",
+      "updatedAt": "2024-03-28T13:28:59.175Z"
+    },
+    {
+      "id": 7,
+      "sourceComp": "topic",
+      "sourceId": 2,
+      "targetComp": "post",
+      "targetId": 3,
+      "type": null,
+      "createdAt": "2024-03-28T13:28:59.175Z",
+      "updatedAt": "2024-03-28T13:28:59.175Z"
+    }
+  ],
+  "downstream": []
+}
+```
+
+---
+
+### Tie-in Library Arguments
+
+Tie-in accepts three arguments when you load the library.
+
+* **knexConfig:** Database configuration (required)
+* **tablePrefix:** A prefix that is added to the beginning of component table names (defaults to '').
+* **is:** An fn-arg-validator instance (optional).
