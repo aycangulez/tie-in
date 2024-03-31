@@ -305,7 +305,8 @@ const postId = await tie.create(post({ content: 'Something interesting' }), {
     upstream: [user({ id: someUserId, relType: 'starter' }), topic({ id: topicId })],
 });
 ```
-Alternatively, the above two operations are better run inside an transaction to ensure all or none behavior:
+
+Alternatively, the above two operations can be run inside a database transaction to ensure all-or-none behavior:
 
 ```js
 const postId = await tie.knex.transaction(async (trx) => {
