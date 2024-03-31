@@ -304,6 +304,18 @@ const topicId = await tie.create(topic({ title: 'New Topic' }));
 const postId = await tie.create(post({ content: 'Something interesting' }), {
     upstream: [user({ id: someUserId, relType: 'starter' }), topic({ id: topicId })],
 });
+
+// Or better yet, run them inside a transaction to ensure all or none behavior
+const postId = await tie.knex.transaction(async (trx) => {
+    const topicId = await tie.create(topic({ title: 'New Topic' }), trx);
+    return await tie.create(
+        post({ content: 'Something interesting' }),
+        {
+            upstream: [user({ id: someUserId, relType: 'starter' }), topic({ id: topicId })],
+        },
+        trx
+    );
+});
 ```
 
 #### tie.update
@@ -396,3 +408,8 @@ Tie-in accepts three arguments when you load the library.
 * **knexConfig:** Database configuration (required)
 * **tablePrefix:** A prefix that is added to the beginning of component table names (defaults to '').
 * **is:** An fn-arg-validator instance (optional).
+
+Once the library is loaded, the following two properties can be used:
+
+* **tie.is:** An fn-arg-validator instance.
+* **tie.knex:** A knex instance.

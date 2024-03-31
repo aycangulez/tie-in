@@ -1,6 +1,6 @@
 {
     "name": "tie-in",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "description": "Relational data component library.",
     "main": "fn-comp.js",
     "scripts": {

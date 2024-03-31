@@ -36,12 +36,12 @@ describe('tie-in', function () {
     });
 
     it('creates user inside an external transaction', async function () {
-        await knex.transaction(
+        const postId = await knex.transaction(
             async (trx) =>
                 await tie.create(user({ username: 'Asuka', email: 'asuka@elsewhere', country: 'JP' }), {}, trx)
         );
         await tie
-            .get(user({ id: 1 }))
+            .get(user({ id: postId }))
             .should.eventually.have.nested.include({ 'user[0].self.username': 'Asuka' })
             .and.have.nested.include({ 'user[0].self.email': 'asuka@elsewhere' });
     });
