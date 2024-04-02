@@ -350,7 +350,7 @@ await tie.del(post({ id: somePostId }));
 
 Syntax: `createRels(comp, rels, trx)`
 
-Creates records (*rels*) related to a component (*comp*). You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
+Creates relationships between the records in *rels* and the component record (*comp*). You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
 
 Related records can be upstream (referencing the newly created record) and/or downstream (referenced from the record). Related records can optionally have types specified by *relType*.
 
