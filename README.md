@@ -204,10 +204,10 @@ When you pass a component to **tie.get**, it uses the arguments passed to the co
 #### Filters
 
 **downstreamLimit:**
-Unless specified, get returns up to 10 levels of downstream related records for each record. You can set this to another number or 0 for none.
+Unless specified, get returns up to 10 levels of downstream related records. You can set this to another number or 0 for none.
 
 **upstreamLimit:**
-Unless specified, get returns up to 10 levels of upstream related records for each record. You can set this to another number or 0 for none.
+Unless specified, get returns up to 10 levels of upstream related records. You can set this to another number or 0 for none.
 
 **filterUpstreamBy:**
 Filters records by upstream relationships. Similar to an inner join.
