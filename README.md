@@ -300,7 +300,7 @@ Relationships can be upstream (referencing the newly created record) and/or down
 ```js
 // Create a new topic
 const topicId = await tie.create(topic({ title: 'New Topic' }));
-// Then create a post, assign a user and the newly created topic as its upstream relations
+// Then create a post, assign a user and the newly created topic as its upstream relationship
 const postId = await tie.create(post({ content: 'Something interesting' }), {
     upstream: [user({ id: someUserId, relType: 'starter' }), topic({ id: topicId })],
 });
