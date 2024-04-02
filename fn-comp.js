@@ -150,7 +150,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         return handleGroupBy(query).modify(addGeneralFilters, filters);
     }
 
-    // Inserts upstream relations for given component records, ignores existing relations
+    // Inserts upstream relationships for given component records, ignores existing relationships
     async function insertUpstreamRels(targetComp, relSources = [], trx = knex) {
         is.valid(is.objectWithProps(compProps), is.maybeArray, is.maybeObject, arguments);
         const targetCompRecs = await selectRecords(targetComp, { limit: -1 }, trx);
@@ -173,7 +173,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         }
     }
 
-    // Inserts downstream relations for given component records, ignores existing relations
+    // Inserts downstream relationships for given component records, ignores existing relationships
     async function insertDownstreamRels(sourceComp, relTargets = [], trx = knex) {
         is.valid(is.objectWithProps(compProps), is.maybeArray, is.maybeObject, arguments);
         const sourceCompRecs = await selectRecords(sourceComp, { limit: -1 }, trx);
@@ -315,7 +315,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         return result;
     }
 
-    // Creates the relations for given component records
+    // Creates the relationships for given component records
     async function createRels(comp, rels, trx) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
         async function steps(trx) {
@@ -327,7 +327,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         return trx ? steps(trx) : knex.transaction(steps);
     }
 
-    // Gets the relations for given component records
+    // Gets the relationships for given component records
     async function getRels(comp, filters = {}, trx) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, arguments);
         async function steps(trx) {
@@ -368,7 +368,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         };
     }
 
-    // Creates a component record and optionally its relations
+    // Creates a component record and optionally its related records
     async function create(comp, rels, trx) {
         is.valid(is.objectWithProps(compProps), is.maybeObject, is.maybeObject, arguments);
         async function steps(trx) {
@@ -412,7 +412,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         return trx ? steps(trx) : knex.transaction(steps);
     }
 
-    // Deletes component records and their relations
+    // Deletes component records and the records related to them
     async function del(comp, filters = {}, trx) {
         is.valid(is.objectWithProps(compProps), is.objectWithProps(getFilterProps), is.maybeObject, arguments);
         async function steps(trx) {

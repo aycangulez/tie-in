@@ -50,7 +50,7 @@ async function firstSteps() {
         downstream: [post({ id: postId, relType: 'child' })],
     });
 
-    // Retrieve topic and its relations
+    // Retrieve topic and related records
     const topicRecs = await tie.get(topic({ id: topicId }));
     console.log(JSON.stringify(topicRecs, null, 2));
 }
@@ -58,7 +58,7 @@ async function firstSteps() {
 firstSteps();
 ```
 
-Once the individual records and their relations are in place, we retrieve the newly created topic with **tie.get**,  which retrieves all the relations grouped together.
+Once the individual records are in place, we retrieve the newly created topic with **tie.get**,  which retrieves all related records grouped together.
 
 ```json
 {
@@ -99,11 +99,11 @@ Once the individual records and their relations are in place, we retrieve the ne
 }
 ```
 
-### Highly Granular Relations
+### Highly Granular Relationships
 
-The relations in a database are usually defined between columns across tables. In Tie-in, however, relations can be defined between individual records. Relations can also have types, so you can have multiple relations between two records.
+The relationships in a database are usually defined between columns across tables. In Tie-in, however, relationships can be defined between individual records. Relationships can also have types, so you can have multiple relationships between two records.
 
-The ability to associate a record with any other record in any table opens up new possibilities that are hard to accomplish with the traditional column-based relations. Also, since relations are dynamic, no schema changes are necessary to define new relations.
+The ability to associate a record with any other record in any table opens up new possibilities that are hard to accomplish with conventional column-based relationships. In addition, since relationships are dynamic, no schema changes are necessary to define new relationships.
 
 ### Defining Components
 
@@ -204,13 +204,13 @@ When you pass a component to **tie.get**, it uses the arguments passed to the co
 #### Filters
 
 **downstreamLimit:**
-Unless specified, get returns up to 10 levels of downstream relations for each record. You can set this to another number or 0 for none.
+Unless specified, get returns up to 10 levels of downstream related records for each record. You can set this to another number or 0 for none.
 
 **upstreamLimit:**
-Unless specified, get returns up to 10 levels of upstream relations for each record. You can set this to another number or 0 for none.
+Unless specified, get returns up to 10 levels of upstream related records for each record. You can set this to another number or 0 for none.
 
 **filterUpstreamBy:**
-Filters records by upstream relations. Similar to an inner join.
+Filters records by upstream relationships. Similar to an inner join.
 
 ```js
 // Returns posts in topic #1
@@ -293,9 +293,9 @@ tie.register([user, post, topic]);
 
 Syntax: `tie.create(comp, rels, trx)`
 
-Creates a component record (*comp*) and optionally its relations (*rels*). Returns the newly created component record's id on success. You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
+Creates a component record (*comp*) and optionally its related records (*rels*). Returns the newly created component record's id on success. You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
 
-Relations can be upstream (referencing the newly created record) and/or downstream (referenced from the newly created record). Relations can optionally have types specified by *relType*.
+Relationships can be upstream (referencing the newly created record) and/or downstream (referenced from the newly created record). Relationships can optionally have types specified by *relType*.
 
 ```js
 // Create a new topic
@@ -338,7 +338,7 @@ await tie.update(user({ id: 1 }), {}, user({ email: 'asuka@elsewhere', updatedAt
 
 Syntax: `tie.del(comp, filters = {}, trx)`
 
-Deletes matching component records and their relations. You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
+Deletes matching component records *and* the related records. You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
 
 The *filters* object can optionally contain the **filterByUpstream** and **where** properties as described under [tie.get filters](https://github.com/aycangulez/tie-in#filters).
 
@@ -350,9 +350,9 @@ await tie.del(post({ id: somePostId }));
 
 Syntax: `createRels(comp, rels, trx)`
 
-Creates relations (*rels*) for a component (*comp*). You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
+Creates records (*rels*) related to a component (*comp*). You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
 
-Relations can be upstream (referencing the newly created record) and/or downstream (referenced from the record). Relations can optionally have types specified by *relType*.
+Related records can be upstream (referencing the newly created record) and/or downstream (referenced from the record). Related records can optionally have types specified by *relType*.
 
 ```js
 await tie.createRels(post({ id: somePostId }), {
