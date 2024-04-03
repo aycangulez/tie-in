@@ -412,7 +412,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         return trx ? steps(trx) : knex.transaction(steps);
     }
 
-    // Deletes component records and the records related to them
+    // Deletes component records and their relationships
     async function del(comp, filters = {}, trx) {
         is.valid(is.objectWithProps(compProps), is.objectWithProps(getFilterProps), is.maybeObject, arguments);
         async function steps(trx) {

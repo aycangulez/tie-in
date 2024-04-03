@@ -338,7 +338,7 @@ await tie.update(user({ id: 1 }), {}, user({ email: 'asuka@elsewhere', updatedAt
 
 Syntax: `tie.del(comp, filters = {}, trx)`
 
-Deletes matching component records *and* the related records. You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
+Deletes matching component records and their relationships. Previously related records will not be deleted. You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
 
 The *filters* object can optionally contain the **filterByUpstream** and **where** properties as described under [tie.get filters](https://github.com/aycangulez/tie-in#filters).
 
