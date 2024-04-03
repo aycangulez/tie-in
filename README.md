@@ -195,7 +195,7 @@ module.exports = (tie) => {
 
 Syntax: `tie.get(comp, filters = {})`
 
-When you pass a component to **tie.get**, it uses the arguments passed to the component for search. Here are some examples:
+When you pass a component instance to **tie.get**, it uses the arguments passed to the component instance for search. Here are some examples:
 
 * `await tie.get(user( {country: 'JP'} ))` returns the users from Japan.
 * `await tie.get(user( {country: 'JP', username: 'Asuka'} ))` returns the users from Japan having the username 'Asuka'.
@@ -293,7 +293,7 @@ tie.register([user, post, topic]);
 
 Syntax: `tie.create(comp, rels, trx)`
 
-Creates a component record (*comp*) and optionally its related records (*rels*). Returns the newly created component record's id on success. You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
+Creates a record based on the component instance (*comp*), and it optionally creates the record's relationships (*rels*). Returns the newly created record's id on success. You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
 
 Relationships can be upstream (referencing the newly created record) and/or downstream (referenced from the newly created record). Relationships can optionally have types specified by *relType*.
 
@@ -338,7 +338,7 @@ await tie.update(user({ id: 1 }), {}, user({ email: 'asuka@elsewhere', updatedAt
 
 Syntax: `tie.del(comp, filters = {}, trx)`
 
-Deletes matching component records and their relationships. Previously related records will not be deleted. You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
+Deletes matching component records and their relationships. Related records will not be deleted. You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
 
 The *filters* object can optionally contain the **filterByUpstream** and **where** properties as described under [tie.get filters](https://github.com/aycangulez/tie-in#filters).
 
@@ -350,7 +350,7 @@ await tie.del(post({ id: somePostId }));
 
 Syntax: `createRels(comp, rels, trx)`
 
-Creates relationships between the records in *rels* and the component record (*comp*). You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
+Creates relationships between the records in *rels* and the component's record (*comp*). You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
 
 Related records can be upstream (referencing the newly created record) and/or downstream (referenced from the record). Related records can optionally have types specified by *relType*.
 
