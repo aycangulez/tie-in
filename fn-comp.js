@@ -79,7 +79,7 @@ const fnComp = function (knexConfig, tablePrefix = '', is) {
         function generateExistsConditon(filterComp) {
             is.valid(is.objectWithProps(compProps), arguments);
             if (!_.get('id')(filterComp.data()) && !filterComp.relType) {
-                throw new Error('id, relType or both are required in filterUpstreamBy');
+                throw new Error("Either 'id' or 'relType' is required in 'filterUpstreamBy'");
             }
             const relTable = tablePrefix + 'rel';
             const query = trx(relTable)

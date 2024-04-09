@@ -210,7 +210,7 @@ Unless specified, get returns up to 10 levels of downstream related records. You
 Unless specified, get returns up to 10 levels of upstream related records. You can set this to another number or 0 for none.
 
 **filterUpstreamBy:**
-Filters records by upstream relationships. Similar to an inner join.
+Filters records by upstream relationships. Similar to an inner join. Component instances passed to filterUpstreamBy must have *id* and/or *relType* values.
 
 ```js
 // Returns posts in topic #1
