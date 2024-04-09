@@ -216,8 +216,8 @@ Filters records by upstream relationships. Similar to an inner join.
 // Returns posts in topic #1
 await tie.get(post(), { filterUpstreamBy: [topic({ id: 1 })] });
 
-// Returns posts in topic #1 by user #2
-await tie.get(post(), { filterUpstreamBy: [topic({ id: 1 }), user({ id: 2 })] });
+// Returns posts in topic #1 by user #2 if the relationship type is "author"
+await tie.get(post(), { filterUpstreamBy: [topic({ id: 1 }), user({ id: 2, relType: 'author' })] });
 ```
 
 **where:** 
@@ -352,7 +352,7 @@ Syntax: `createRels(comp, rels, trx)`
 
 Creates relationships between the records in *rels* and the component's record (*comp*). You can also pass an optional knex transaction (*trx*) if you would like to run this operation inside a transaction as a part of other database operations.
 
-Related records can be upstream (referencing the newly created record) and/or downstream (referenced from the record). Related records can optionally have types specified by *relType*.
+Related records can be upstream (referencing a record) and/or downstream (referenced from the record). Related records can optionally have types specified by *relType*.
 
 ```js
 await tie.createRels(post({ id: somePostId }), {

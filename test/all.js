@@ -125,6 +125,34 @@ describe('tie-in', function () {
             .and.have.nested.include({ 'post[0].topic[0].self.title': 'Topic 1' })
             .and.does.not.have.nested.include({ 'post[1].self.content': 'Post 1' });
     });
+    it('counts posts in topic #1 that have authors', async function () {
+        await tie.get(post(), { filterUpstreamBy: [topic()] }).should.eventually.be.rejectedWith('required');
+        await tie
+            .get(post(), {
+                aggregate: [{ fn: 'count', args: '*' }],
+                filterUpstreamBy: [topic({ id: 1 }), user({ relType: 'author' })],
+            })
+            .should.eventually.have.nested.include({ 'post[0].aggregate.count': '2' });
+        await tie
+            .get(post(), {
+                aggregate: [{ fn: 'count', args: '*' }],
+                filterUpstreamBy: [topic({ id: 1 }), user({ relType: '<invalid>' })],
+            })
+            .should.eventually.have.nested.include({ 'post[0].aggregate.count': '0' });
+        await tie
+            .get(post(), {
+                aggregate: [{ fn: 'count', args: '*' }],
+                filterUpstreamBy: [topic({ id: 1 }), user({ id: 2, relType: 'author' })],
+            })
+            .should.eventually.have.nested.include({ 'post[0].aggregate.count': '1' });
+        await tie
+            .get(post(), {
+                aggregate: [{ fn: 'count', args: '*' }],
+                filterUpstreamBy: [topic({ id: 1 }), user({ id: 2, relType: '<invalid>' })],
+            })
+            .should.eventually.have.nested.include({ 'post[0].aggregate.count': '0' });
+    });
+
     it('gets posts with ids greater than 2 with upstream and downstream set to 0', async function () {
         await tie
             .get(post(), {
